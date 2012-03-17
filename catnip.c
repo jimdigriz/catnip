@@ -565,8 +565,10 @@ int main(int argc, char **argv)
 		pcaprec_hdr.incl_len	= (n > snaplen) ? snaplen : n;
 		pcaprec_hdr.orig_len	= n;
 	
-		if (pcap_hdr.network == DLT_LINUX_SLL)
-			pcaprec_hdr.incl_len	+= sizeof(hdrp);
+		if (pcap_hdr.network == DLT_LINUX_SLL) {
+			pcaprec_hdr.incl_len += sizeof(hdrp);
+			pcaprec_hdr.orig_len += sizeof(hdrp);
+		}
 
 		fwrite(&pcaprec_hdr, sizeof(pcaprec_hdr), 1, file);
 		if (ferror(file)) {
