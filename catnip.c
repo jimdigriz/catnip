@@ -2,10 +2,10 @@
  * catnip - tiny non-libpcap based network packet capturing tool
  * Copyright (C) 2010  Alexander Clouter <alex@digriz.org.uk>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * or alternatively visit <http://www.gnu.org/licenses/gpl.html>
  */
 
-/* compile with: gcc -Wall -O0 -g -o catnip catnip.c */
+/*
+ * compile with either:
+ *  production: gcc -Wall -Os    -o catnip catnip.c; strip catnip
+ *   debug dev: gcc -Wall -O0 -g -o catnip catnip.c
+ */
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -30,6 +36,10 @@
 #include <sysexits.h>
 #include <signal.h>
 #include <poll.h>
+#include <libgen.h>
+#include <sys/types.h>
+#include <grp.h>
+#include <pwd.h>
 
 #include <netinet/in.h>
 #include <net/if.h>
@@ -38,6 +48,8 @@
 #include <net/ethernet.h>
 #include <sys/ioctl.h>
 #include <linux/filter.h>
+
+#define	VERSION "2010080800"
 
 /* snippets from libpcap */
 #define	DLT_EN10MB	  1	/* pcap/bpf.h */
@@ -83,7 +95,13 @@ static struct pcap_hdr_s pcap_hdr = {
 	.sigfigs	= 0,
 };
 
-unsigned int	snaplen	= 96;
+#define		UID	"nobody"
+#define		GID	"nogroup"
+#define		SNAPLEN	96
+
+char		*uid	= UID;
+char		*gid	= GID;
+unsigned int	snaplen	= SNAPLEN;
 char		*ifname	= NULL;
 unsigned int	promisc	= 1;
 unsigned int	pktbuf	= 0;
@@ -112,8 +130,14 @@ int parse_args(int argc, char **argv)
      
 	opterr = 0;
      
-	while ((c = getopt(argc, argv, "pUs:i:F:w:")) != -1)
+	while ((c = getopt(argc, argv, "u:g:pUs:i:F:w:Vh")) != -1)
 	switch (c) {
+	case 'u':
+		uid = optarg;
+		break;
+	case 'g':
+		gid = optarg;
+		break;
 	case 'p':
 		promisc = 0;
 		break;
@@ -145,14 +169,50 @@ int parse_args(int argc, char **argv)
 		wpath = optarg;
 		break;
 	case '?':
-		if (optopt == 's' || optopt == 'i' || optopt == 'F' || optopt == 'w')
+		switch (optopt) {
+		case 'u':
+		case 'g':
+		case 's':
+		case 'i':
+		case 'F':
+		case 'w':
 			fprintf(stderr, "option -%c requires an argument.\n", optopt);
-		else if (isprint (optopt))
-			fprintf(stderr, "unknown option `-%c'.\n", optopt);
-		else
-			fprintf(stderr, "unknown option character `\\x%x'.\n", optopt);
+			break;
+		default:
+			if (isprint(optopt))
+				fprintf(stderr, "unknown option `-%c'.\n", optopt);
+			else
+				fprintf(stderr, "unknown option character `\\x%x'.\n", optopt);
+		}
 		return -EX_USAGE;
+	case 'V':
+		printf("%s %s\n\n", basename(argv[0]), VERSION);
+		printf(	"Copyright (C) 2010 Alexander Clouter <alex@digriz.org.uk>\n"
+			"License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n"
+			"This is free software: you are free to change and redistribute it.\n"
+			"There is NO WARRANTY, to the extent permitted by law.\n");
+		return -EX_SOFTWARE;
+	case 'h':
 	default:
+		printf("Usage: %s [options] -i interface [(-q|-v)]\n", basename(argv[0]));
+		printf(	"A tiny non-libpcap based network packet capturing tool\n"
+			"\n"
+			"  -u name	drop privileges to user (default: '%s')\n"
+			"  -g name	drop privileges to group (default: '%s')\n"
+			"\n"
+			"  -p		do not put interface into promiscuous mode\n"
+			"  -U		'packet-buffered', write each packet out as it arrives\n"
+			"  -s snaplen	truncate packet to snaplen bytes, '0' sets to max (default: %i)\n"
+			"  -i interface	interface to sniff on, 'any' to sniff on all (required)\n"
+			"  -F filename	read in filter rules from file, use '-' for stdin\n"
+			"		(parses output from 'tcpdump -i lo -ddd <filter>')\n"
+			"  -w filename	destination for pcap compatible capture file (default: stdout)\n"
+			"\n"
+			"  -q		be quieter\n"
+			"  -v		be more verbose\n"
+			"\n"
+			"  -h		display this help and exit\n"
+			"  -V		print version information and exit\n", UID, GID, SNAPLEN);
 		return -EX_SOFTWARE;
 	}
 
@@ -477,6 +537,8 @@ int main(int argc, char **argv)
 	struct pcaprec_hdr_s	pcaprec_hdr;
 	struct sll_header	hdrp;
 	struct sockaddr_ll	from;
+	struct group		*grgid;
+	struct passwd		*pwuid;
 	socklen_t		fromlen = sizeof(from);
 
 	if ((ret = parse_args(argc, argv)))
@@ -500,6 +562,27 @@ int main(int argc, char **argv)
 			return EX_OSFILE;
 		}
 	}
+
+	errno = 0;
+	grgid = getgrnam(gid);
+	if (grgid) {
+		if (setgid(grgid->gr_gid))
+			fprintf(stderr, "unable to drop group privileges: %s\n", strerror(errno));
+	}
+	else if (errno)
+		fprintf(stderr, "unable to find group '%s' to drop privileges to: %s\n", gid, strerror(errno));
+	else
+		fprintf(stderr, "unable to find group '%s' to drop privileges to\n", gid);
+	errno = 0;
+	pwuid = getpwnam(uid);
+	if (pwuid) {
+		if (setuid(pwuid->pw_uid))
+			fprintf(stderr, "unable to drop user privileges: %s\n", strerror(errno));
+	}
+	else if (errno)
+		fprintf(stderr, "unable to find user '%s' to drop privileges to: %s\n", uid, strerror(errno));
+	else
+		fprintf(stderr, "unable to find user '%s' to drop privileges to\n", uid);
 
 	fwrite(&pcap_hdr, sizeof(pcap_hdr), 1, file);
 	if (ferror(file)) {
