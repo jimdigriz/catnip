@@ -25,6 +25,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <limits.h>
 #include <fcntl.h>
 #include <sysexits.h>
 #include <signal.h>
@@ -45,6 +46,7 @@
 #define	DLT_IEEE802_11	105
 #define	DLT_LINUX_SLL	113	
 #define	SLL_ADDRLEN	  8	/* pcap/sll.h */
+#define SLL_HDR_LEN	 16
 
 /* http://wiki.wireshark.org/Development/LibpcapFileFormat */
 struct pcap_hdr_s {
@@ -181,7 +183,7 @@ int parse_args(int argc, char **argv)
 int cook_fprog(struct sock_fprog *fprog)
 {
 	FILE		*file;
-	unsigned int	n, code, jt, jf, k;
+	unsigned int	n, len, i, code, jt, jf, k;
 
 	if (!strcmp(fpath, "-"))
 		file = stdin;
@@ -192,74 +194,101 @@ int cook_fprog(struct sock_fprog *fprog)
 		}
 	}
 
-	fprog->len = 0;
-	fprog->filter = NULL;
-	while (1) {
+	errno = 0;
+	n = fscanf(file, "%u\n", &len);
+	if (n == 1) {
+		if (len > USHRT_MAX) {
+			fprintf(stderr, "filter length is %d (max is %d)\n", len, USHRT_MAX);
+			fclose(file);
+			free(fprog->filter);
+			return -EX_DATAERR;
+		}
+
+		if (!(fprog->filter = malloc(len*sizeof(struct sock_filter)))) {
+			perror("malloc[filter]");
+			fclose(file);
+			free(fprog->filter);
+			return -EX_SOFTWARE;
+		}
+
+		fprog->len = len;
+	}
+	else if (errno != 0) {
+		perror("fscanf[count]");
+		fclose(file);
+		free(fprog->filter);
+		return -EX_DATAERR;
+	}
+	else {
+		fprintf(stderr, "malformed filter length\n");
+		fclose(file);
+		free(fprog->filter);
+		return -EX_DATAERR;
+	}
+
+	for (i = 0; i < fprog->len; i++) {
 		errno = 0;
 
-		/* tcpdump -i lo -dd <filter> */
-		n = fscanf(file, "{ 0x%2x, %u, %u, 0x%8x },\n", &code, &jt, &jf, &k);
+		/* tcpdump -i lo -ddd <filter> */
+		n = fscanf(file, "%u %u %u %u\n", &code, &jt, &jf, &k);
+
 		if (n == EOF)
 			break;
 
 		if (n == 4) {
-			if (jt > 255 || jf > 255) {
-				fprintf(stderr, "invalid data types in filter\n");
-				free(fprog->filter);
-				return -EX_DATAERR;
+			if (code > 65535 || jt > 255 || jf > 255) {
+				fprintf(stderr, "malformed filter element range at line %d\n", i);
+				break;
 			}
-
-			if (!(fprog->filter = realloc(fprog->filter,
-					(fprog->len+1)*sizeof(struct sock_filter)))) {
-				perror("realloc[filter]");
-				free(fprog->filter);
-				return -EX_SOFTWARE;
-			}
-
-			fprog->filter[fprog->len].code	= code;
-			fprog->filter[fprog->len].jt	= jt;
-			fprog->filter[fprog->len].jf	= jf;
-			fprog->filter[fprog->len].k	= k;
 
 			/* fixups */
+			/* consult libpcap/pcap-linux.c:fix_program() for wisdom */
 			switch (BPF_CLASS(code)) {
 			/* http://marc.info/?l=tcpdump-workers&m=96542058228629&w=2 */
 			case BPF_RET:
-				if (k)
-					fprog->filter[fprog->len].k = 65535;
+				if (BPF_MODE(code) == BPF_K && k)
+					k = 65535;
 				break;
-			/* ld/st's for DLT_LINUX_SLL are +2 compared to lo */
 			case BPF_LD:
 			case BPF_LDX:
-			case BPF_ST:
-			case BPF_STX:
-				if (pcap_hdr.network == DLT_LINUX_SLL)
-					fprog->filter[fprog->len].k += 2;
+				if (BPF_MODE(code) == BPF_ABS
+						|| BPF_MODE(code) == BPF_IND
+						|| BPF_MODE(code) == BPF_MSH)
+					if (pcap_hdr.network == DLT_LINUX_SLL) {
+						/* load's (store?) for DLT_LINUX_SLL are +2 compared to lo */
+						k += 2;
+
+						if (k >= SLL_HDR_LEN)
+							k -= SLL_HDR_LEN;
+						else if (k == 14)
+							k = SKF_AD_OFF + SKF_AD_PROTOCOL;
+					}
 				break;
 			}
 
-			fprog->len++;
+			fprog->filter[i].code	= code;
+			fprog->filter[i].jt	= jt;
+			fprog->filter[i].jf	= jf;
+			fprog->filter[i].k	= k;
 		}
 		else if (errno != 0) {
-			perror("fscanf");
-			free(fprog->filter);
-			return -EX_DATAERR;
+			perror("fscanf[filter]");
+			break;
 		}
 		else {
-			fprintf(stderr, "malformed filter\n");
-			free(fprog->filter);
-			return -EX_DATAERR;
+			fprintf(stderr, "malformed filter at line %d\n", i);
+			break;
 		}
 	}
 
 	fclose(file);
 
-	if (fprog->len == 0) {
-		fprintf(stderr, "filter is empty\n");
-		return -EX_DATAERR;
-	}
+	if (i == fprog->len)
+		return 0;
 
-	return 0;
+	fprintf(stderr, "expected %d filter instructions, read %d\n", fprog->len, i);
+	free(fprog->filter);
+	return -EX_DATAERR;
 }
 
 int set_promisc(unsigned int state) {
