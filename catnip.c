@@ -18,12 +18,6 @@
  * or alternatively visit <http://www.gnu.org/licenses/gpl.html>
  */
 
-/*
- * compile with either:
- *  production: gcc -Wall -Os    -o catnip catnip.c; strip catnip
- *   debug dev: gcc -Wall -O0 -g -o catnip catnip.c
- */
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,45 +41,16 @@
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #include <sys/ioctl.h>
+
+#ifdef __linux__
 #include <linux/filter.h>
+#elif (__FreeBSD__ || __NetBSD__)
+#include <net/bpf.h>
+#endif
 
-#define	VERSION "2010080800"
-
-/* snippets from libpcap */
-#define	DLT_EN10MB	  1	/* pcap/bpf.h */
-#define	DLT_PPP		  9
-#define	DLT_RAW		 12
-#define	DLT_IEEE802_11	105
-#define	DLT_LINUX_SLL	113	
-#define	SLL_ADDRLEN	  8	/* pcap/sll.h */
-#define SLL_HDR_LEN	 16
-
-/* http://wiki.wireshark.org/Development/LibpcapFileFormat */
-struct pcap_hdr_s {
-	uint32_t	magic_number;	/* magic number */
-	uint16_t	version_major;	/* major version number */
-	uint16_t	version_minor;	/* minor version number */
-	int32_t		thiszone;	/* GMT to local correction */
-	uint32_t	sigfigs;	/* accuracy of timestamps */
-	uint32_t	snaplen;	/* max length of captured packets, in octets */
-	uint32_t	network;	/* data link type */
-} __attribute__((packed));
-/* N.B. unable to use 'struct timeval' due to 64bit 'long' woes */
-struct pcaprec_hdr_s {
-	uint32_t	ts_sec;		/* timestamp seconds */
-	uint32_t	ts_usec;	/* timestamp microseconds */
-	uint32_t	incl_len;	/* number of octets of packet saved in file */
-	uint32_t	orig_len;	/* actual length of packet */
-} __attribute__((packed));
-
-/* libpcap/sll.h */
-struct sll_header {
-	u_int16_t	sll_pkttype;		/* packet type */
-	u_int16_t	sll_hatype;		/* link-layer address type */
-	u_int16_t	sll_halen;		/* link-layer address length */
-	u_int8_t	sll_addr[SLL_ADDRLEN];	/* link-layer address */
-	u_int16_t	sll_protocol;		/* protocol */
-} __attribute__((packed));
+#include "pcap-bpf.h"
+#include "pcap-sll.h"
+#include "pcap-filefmt.h"
 
 static struct pcap_hdr_s pcap_hdr = {
 	.magic_number	= 0xa1b2c3d4,
