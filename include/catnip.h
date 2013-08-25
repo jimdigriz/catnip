@@ -1,5 +1,6 @@
 /*
- * catnip - remote packet mirroring client with BPF support
+ * This file is part of:
+ *      catnip - remote packet mirroring suite with BPF support
  * Copyright (C) 2013  Alexander Clouter <alex@digriz.org.uk>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,17 +19,31 @@
  * or alternatively visit <http://www.gnu.org/licenses/gpl.html>
  */
 
-#include <errno.h>
-#include <sysexits.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <stdint.h>
 
-#include "catnip.h"
+#define MAX(a,b) ((a) > (b) ? a : b)
+#define MIN(a,b) ((a) < (b) ? a : b)
 
-int main(int argc, char **argv)
-{
-	if (sendcmd(STDOUT_FILENO, CATNIP_CMD_IFLIST))
-		return errno;
+int parse_args(int argc, char **argv);
 
-	return EX_OK;
-}
+enum {
+	CATNIP_CMD_IFLIST,
+};
+
+enum {
+	CATNIP_IFF_UP,
+	CATNIP_IFF_LOOPBACK,
+	CATNIP_IFF_POINTOPOINT,
+	CATNIP_IFF_NOARP,
+	CATNIP_IFF_PROMISC,
+};
+
+#define	CATNIP_IFNAMSIZ	10
+struct catnip_iflist {
+	char	name[CATNIP_IFNAMSIZ];
+	uint8_t	flags;
+};
+
+int sendcmd(int, char);
+
+int respondcmd_iflist(int);

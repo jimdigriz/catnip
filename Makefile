@@ -1,23 +1,19 @@
-CFLAGS  = -pipe -Wall -pedantic -std=c99
+CFLAGS  = -pipe -pedantic -Wall -std=c99
 #LDFLAGS = 
 
 VERSION=$(shell git show -s --pretty=format:"%ci [git commit: %h]")
 
 KERNEL  = $(shell uname -s)
 
-OBJS    = catnip.o
+FLAGS	= -DVERSION="\"$(VERSION)\""
 
-all: env catnip
+all: catnip catnipd
 
-env:
 ifeq ($(KERNEL), Linux)
 CFLAGS += -D_BSD_SOURCE -D_GNU_SOURCE
-else ifeq ($(KERNEL), FreeBSD)
-	@echo FreeBSD untested, expect your pants to explode!
-CFLAGS += -D__BSD_VISIBLE
-else ifeq ($(KERNEL), FreeBSD)
-	@echo NetBSD untested, expect your pants to explode!
-CFLAGS += -D__BSD_VISIBLE
+#else ifneq (,$(filter $(KERNEL),FreeBSD NetBSD))
+#	@echo $(KERNEL) untested, expect your pants to explode!
+#CFLAGS += -D__BSD_VISIBLE
 else
 	@echo Sorry \'$(KERNEL)\' is not supported
 	@false
@@ -35,14 +31,24 @@ else
 	endif
 endif
 
-catnip: $(OBJS)
-	$(CROSS_COMPILE)$(CC) $(LDFLAGS) $^ -o catnip
-ifdef EMBEDDED
-	$(CROSS_COMPILE)strip catnip
-endif
+catnip: catnip.o getopt-client.o cmd.o
+
+catnipd: catnipd.o getopt-daemon.o cmd.o
+
+getopt-client.o: getopt.c
+	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude $(FLAGS) -o $@ $<
+
+getopt-daemon.o: getopt.c
+	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude $(FLAGS) -DDAEMON -o $@ $<
 
 %.o: %.c
-	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude -DVERSION="\"$(VERSION)\"" $<
+	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude $(FLAGS) $<
+
+%: %.o
+	$(CROSS_COMPILE)$(CC) $(LDFLAGS) $^ -o $@
+ifdef EMBEDDED
+	$(CROSS_COMPILE)strip $@
+endif
 
 clean:
-	rm -f $(OBJS) catnip
+	rm -f *.o catnip catnipd

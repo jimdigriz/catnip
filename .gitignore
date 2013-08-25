@@ -1,0 +1,8 @@
+.*
+!.gitignore
+
+*.o
+*.orig
+
+catnip
+catnipd

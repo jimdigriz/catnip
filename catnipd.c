@@ -1,5 +1,5 @@
 /*
- * catnip - remote packet mirroring client with BPF support
+ * catnipd - remote packet mirroring daemon with BPF support
  * Copyright (C) 2013  Alexander Clouter <alex@digriz.org.uk>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,16 +18,17 @@
  * or alternatively visit <http://www.gnu.org/licenses/gpl.html>
  */
 
-#include <errno.h>
 #include <sysexits.h>
 #include <sys/types.h>
+#include <errno.h>
+#include <ifaddrs.h>
 #include <unistd.h>
 
 #include "catnip.h"
 
 int main(int argc, char **argv)
 {
-	if (sendcmd(STDOUT_FILENO, CATNIP_CMD_IFLIST))
+	if (respondcmd_iflist(STDOUT_FILENO))
 		return errno;
 
 	return EX_OK;
