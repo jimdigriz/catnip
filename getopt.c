@@ -34,13 +34,12 @@
 #	define GETOPT	"vVh"
 #else
 #	define MODE	"client"
-#	define GETOPT	"H:P:A:Dps:vVh"
+#	define GETOPT	"H:P:Dps:vVh"
 #endif
 
 #ifndef DAEMON
 char	*hostname	= NULL;
 char	*port		= CATNIP_PORT;
-char	*auth		= NULL;
 bool	listif		= 0;
 bool	nopromisc	= 0;
 int	snaplen		= 65535;
@@ -66,9 +65,6 @@ int parse_args(int argc, char **argv)
 	case 'P':
 		port = optarg;
 		break;
-	case 'A':
-		auth = optarg;
-		break;
 	case 'D':
 		listif = 1;
 		break;
@@ -82,7 +78,6 @@ int parse_args(int argc, char **argv)
 		switch (optopt) {
 		case 'H':
 		case 'P':
-		case 'A':
 		case 's':
 			dprintf(STDERR_FILENO, "option -%c requires an argument.\n", optopt);
 			break;
@@ -113,7 +108,6 @@ int parse_args(int argc, char **argv)
 			"\n"
 			"  -H		host to connect to\n"
 			"  -P		port to connect to (default: " CATNIP_PORT ")\n"
-			"  -A KEY	authenticate using KEY\n"
 			"  -D		Print the list of the network interfaces\n"
 			"		available on the system\n"
 			"  -p		Don't put the interface into promiscuous mode\n"

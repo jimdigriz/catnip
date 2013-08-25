@@ -1,4 +1,4 @@
-CFLAGS  = -pipe -pedantic -Wall -std=c99 -D_XOPEN_SOURCE
+CFLAGS  = -pipe -pedantic -Wall -std=c99
 LDFLAGS =
 
 VERSION=$(shell git show -s --pretty=format:"%ci [git commit: %h]")
@@ -11,7 +11,6 @@ all: catnip catnipd
 
 ifeq ($(KERNEL), Linux)
 CFLAGS	+= -D_BSD_SOURCE -D_GNU_SOURCE
-LDFLAGS	+= -lcrypt
 else ifneq (,$(filter $(KERNEL),FreeBSD NetBSD Darwin))
 	@echo $(KERNEL) untested, expect your pants to explode!
 CFLAGS	+= -D__BSD_VISIBLE

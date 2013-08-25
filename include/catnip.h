@@ -33,7 +33,6 @@
 /* message codes */
 enum {
 	CATNIP_MSG_ERROR,
-	CATNIP_MSG_AUTH,
 	CATNIP_MSG_IFLIST,
 };
 
@@ -44,11 +43,6 @@ struct catnip_msg {
 		struct {
 			uint8_t			sysexit;
 		} error;
-
-		struct {
-			char			salt[11];
-			char			token[22];
-		} auth;
 
 		struct {
 			uint8_t			num;

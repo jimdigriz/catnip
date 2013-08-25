@@ -34,7 +34,6 @@
 
 extern char	*hostname;
 extern char	*port;
-extern char	*auth;
 extern bool	listif;
 extern bool	nopromisc;
 extern int	snaplen;
@@ -121,69 +120,6 @@ int do_iflist(int s)
 	return EX_OK;
 }
 
-int do_auth(int s)
-{
-	struct catnip_msg msg = {
-		.code			= CATNIP_MSG_AUTH,
-		.payload.auth.salt	= "$1$........",
-	};
-	int i;
-	int rc;
-	unsigned int seed[2];
-	int fd;
-	const char *const seedchars =
-		"./0123456789ABCDEFGHIJKLMNOPQRST"
-		"UVWXYZabcdefghijklmnopqrstuvwxyz";
-	char *token;
-
-	fd = open("/dev/urandom", O_RDONLY);
-	if (fd < 0) {
-		PERROR("open(/dev/urandom)");
-		return errno;
-	}
-
-	rc = rd(fd, &seed, sizeof(seed));
-	if (rc) {
-		close(fd);
-		return -rc;
-	}
-
-	close(fd);
-
-	srand(seed[0]);
-	seed[0] = rand();
-	seed[1] = rand();
-
-	for (i = 0; i < 8; i++)
-		msg.payload.auth.salt[3+i] = seedchars[(seed[i/5] >> (i%5)*6) & 0x3f];
-
-	if (!auth)
-		auth = "\0";
-
-	token = crypt(auth, msg.payload.auth.salt);
-	strncpy(msg.payload.auth.token, token, sizeof(msg.payload.auth.token));
-
-	rc = wr(s, &msg, sizeof(msg));
-	if (rc)
-		return -rc;
-
-	rc = rd(s, &msg, sizeof(msg));
-	if (rc)
-		return -rc;
-
-	if (msg.code != CATNIP_MSG_ERROR) {
-		dprintf(STDERR_FILENO, "response is different msg.code\n");
-		return -EX_PROTOCOL;
-	}
-
-	if (msg.payload.error.sysexit != EX_OK) {
-		dprintf(STDERR_FILENO, "auth failed\n");
-		return -msg.payload.error.sysexit;
-	}
-	
-	return EX_OK;
-}
-
 int main(int argc, char **argv)
 {
 	int rc;
@@ -196,10 +132,6 @@ int main(int argc, char **argv)
 	s = hookup(hostname, port);
 	if (s < 0)
 		return -s;
-
-	rc = do_auth(s);
-	if (rc)
-		return -rc;
 
 	if (listif) {
 		rc = do_iflist(s);

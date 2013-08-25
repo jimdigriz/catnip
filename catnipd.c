@@ -30,15 +30,11 @@
 
 extern int	verbose;
 
-char		*auth;
-
 int main(int argc, char **argv)
 {
 	int rc;
 
 	rc = parse_args(argc, argv);
-
-	auth = getenv("CATNIP_AUTH");
 
 	while (rc == EX_OK) {
 		struct catnip_msg msg;
@@ -47,40 +43,7 @@ int main(int argc, char **argv)
 		if (rc)
 			break;
 
-		if (msg.code != CATNIP_MSG_AUTH) {
-			dprintf(STDERR_FILENO, "auth required\n");
-
-			msg.code = CATNIP_MSG_ERROR;
-			msg.payload.error.sysexit = EX_NOPERM;
-			wr(STDOUT_FILENO, &msg, sizeof(msg));
-			rc = EX_NOPERM;
-			break;
-		}
-
 		switch (msg.code) {
-		case CATNIP_MSG_AUTH:
-			dprintf(STDERR_FILENO, "recv CATNIP_MSG_AUTH\n");
-			if (!auth)
-				auth = "\0";
-
-			char *token = crypt(auth, msg.payload.auth.salt);
-			if (strncmp(	token, msg.payload.auth.token,
-					sizeof(msg.payload.auth.token))) {
-				dprintf(STDERR_FILENO, "auth failed\n");
-				msg.code = CATNIP_MSG_ERROR;
-				msg.payload.error.sysexit = EX_NOPERM;
-				wr(STDOUT_FILENO, &msg, sizeof(msg));
-				rc = EX_NOPERM;
-				break;	
-			}
-
-			auth = NULL;
-
-			msg.code = CATNIP_MSG_ERROR;
-			msg.payload.error.sysexit = EX_OK;
-			wr(STDOUT_FILENO, &msg, sizeof(msg));
-
-			break;
 		case CATNIP_MSG_IFLIST:
 			dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
 			if (respondcmd_iflist()) {
