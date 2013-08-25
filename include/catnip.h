@@ -21,10 +21,8 @@
 
 #include <stdint.h>
 
-#define MAX(a,b) ((a) > (b) ? a : b)
-#define MIN(a,b) ((a) < (b) ? a : b)
-
-int parse_args(int argc, char **argv);
+#define MAX(a,b)	((a) > (b) ? a : b)
+#define MIN(a,b)	((a) < (b) ? a : b)
 
 enum {
 	CATNIP_CMD_IFLIST,
@@ -39,10 +37,13 @@ enum {
 };
 
 #define	CATNIP_IFNAMSIZ	10
+
 struct catnip_iflist {
 	char	name[CATNIP_IFNAMSIZ];
 	uint8_t	flags;
 } __attribute__((packed));
+
+int parse_args(int argc, char **argv);
 
 int sendcmd(int, char);
 

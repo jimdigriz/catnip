@@ -29,8 +29,6 @@
 #include <net/if.h>
 #include <unistd.h>
 
-#include "catnip.h"
-
 #ifdef AF_LINK
 #	include <net/if_dl.h>
 #elif __linux__
@@ -40,62 +38,69 @@
 #	error neither AF_LINK or AF_PACKET available, aborting
 #endif
 
+#include "catnip.h"
+
 int sendcmd(int s, char cmd)
 {
 	return 0;
 }
 
+/*
+ * uint8_t			number of items
+ * struct catnip_iflist 	array of struct
+ */
 int respondcmd_iflist(int s)
 {
 	struct ifaddrs *ifaddr, *ifa;
 	struct catnip_iflist *iflist;
-	uint8_t i;
+	uint8_t num;
 	
 	if (getifaddrs(&ifaddr) == -1) {
 		perror("getifaddrs");
 		return errno;
 	}
 
-	i = 0;
+	num = 0;
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
 		int family = ifa->ifa_addr->sa_family;
 
 		if (family != AF_LINK)
 			continue;
 
-		i++;
+		num++;
 	}
 
-	iflist = alloca(i*sizeof(struct catnip_iflist));
-	memset(iflist, 0, i*sizeof(struct catnip_iflist));
+	iflist = alloca(num*sizeof(struct catnip_iflist));
+	memset(iflist, 0, num*sizeof(struct catnip_iflist));
 
-	i = 0;
+	num = 0;
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
 		int family = ifa->ifa_addr->sa_family;
 
 		if (family != AF_LINK)
 			continue;
 
-		strncpy(iflist[i].name, ifa->ifa_name, MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
+		strncpy(iflist[num].name, ifa->ifa_name,
+				MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
 
 		if (ifa->ifa_flags & IFF_UP)
-			iflist[i].flags |= (1<<CATNIP_IFF_UP);
+			iflist[num].flags |= (1<<CATNIP_IFF_UP);
 		if (ifa->ifa_flags & IFF_LOOPBACK)
-			iflist[i].flags |= (1<<CATNIP_IFF_LOOPBACK);
+			iflist[num].flags |= (1<<CATNIP_IFF_LOOPBACK);
 		if (ifa->ifa_flags & IFF_POINTOPOINT)
-			iflist[i].flags |= (1<<CATNIP_IFF_POINTOPOINT);
+			iflist[num].flags |= (1<<CATNIP_IFF_POINTOPOINT);
 		if (ifa->ifa_flags & IFF_NOARP)
-			iflist[i].flags |= (1<<CATNIP_IFF_NOARP);
+			iflist[num].flags |= (1<<CATNIP_IFF_NOARP);
 		if (ifa->ifa_flags & IFF_PROMISC)
-			iflist[i].flags |= (1<<CATNIP_IFF_PROMISC);
+			iflist[num].flags |= (1<<CATNIP_IFF_PROMISC);
 
-		i++;
+		num++;
 	}
 
 	freeifaddrs(ifaddr);
 
-	write(s, &i, 1);
-	write(s, iflist, i*sizeof(struct catnip_iflist));
+	write(s, &num, 1);
+	write(s, iflist, num*sizeof(struct catnip_iflist));
 
 	return EX_OK;
 }
