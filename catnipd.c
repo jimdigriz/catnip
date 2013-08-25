@@ -27,7 +27,7 @@
 
 #include "catnip.h"
 
-extern int verbose;
+extern int	verbose;
 
 int main(int argc, char **argv)
 {
@@ -36,27 +36,11 @@ int main(int argc, char **argv)
 	rc = parse_args(argc, argv);
 
 	while (rc == EX_OK) {
-		int count;
 		struct catnip_msg msg;
 
-		count = read(STDIN_FILENO, &msg, sizeof(msg));
-		if (count < 0) {
-			if (errno == EINTR)
-				continue;
-
-			PERROR("read");
-			rc = EX_OSERR;
+		rc = msgrecv(STDIN_FILENO, &msg, sizeof(msg));
+		if (rc)
 			break;
-		}
-		if (count == 0) {
-			dprintf(STDERR_FILENO, "received EOF, exiting\n");
-			break;
-		}
-		if (count < sizeof(msg)) {
-			dprintf(STDERR_FILENO, "could not read in whole msg, exiting\n");
-			rc = EX_DATAERR;
-			break;
-		}
 
 		switch (msg.code) {
 		case CATNIP_MSG_IFLIST:
@@ -65,11 +49,7 @@ int main(int argc, char **argv)
 				msg.code = CATNIP_MSG_ERROR;
 				msg.payload.error.sysexit = errno;
 				rc = errno;
-				errno = 0;
-				if (write(STDOUT_FILENO, &msg, sizeof(msg)) < 0) {
-					PERROR("write");
-					rc = errno;
-				}
+				msgsend(STDOUT_FILENO, &msg, sizeof(msg));
 			}
 			break;
 		default:
@@ -77,10 +57,7 @@ int main(int argc, char **argv)
 			msg.code = CATNIP_MSG_ERROR;
 			msg.payload.error.sysexit = EX_PROTOCOL;
 			rc = EX_PROTOCOL;
-			if (write(STDOUT_FILENO, &msg, sizeof(msg)) < 0) {
-				PERROR("write");
-				rc = errno;
-			}
+			msgsend(STDOUT_FILENO, &msg, sizeof(msg));
 		}
 	}
 
