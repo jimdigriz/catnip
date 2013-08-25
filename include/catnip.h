@@ -42,7 +42,7 @@ enum {
 struct catnip_iflist {
 	char	name[CATNIP_IFNAMSIZ];
 	uint8_t	flags;
-};
+} __attribute__((packed));
 
 int sendcmd(int, char);
 
