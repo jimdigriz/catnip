@@ -28,6 +28,7 @@
 #include <string.h>
 #include <net/if.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #ifdef AF_LINK
 #	include <net/if_dl.h>
@@ -40,67 +41,125 @@
 
 #include "catnip.h"
 
-int sendcmd(int s, char cmd)
+int msgsend(int s, void *data, size_t size)
 {
-	return 0;
+	int count;
+
+	do {
+		count = write(s, data, size);
+
+		if (count < 0) {
+			if (errno == EINTR)
+				continue;
+
+			PERROR("write");
+			return -EX_OSERR;
+		}
+	} while (count < 0);
+
+	if (count == 0) {
+		dprintf(STDERR_FILENO, "received EOF, exiting\n");
+		return -EX_DATAERR;
+	}
+	if (count < size) {
+		dprintf(STDERR_FILENO, "could not send out all data, exiting\n");
+		return -EX_DATAERR;
+	}
+
+	return EX_OK;
 }
 
-/*
- * uint8_t			number of items
- * struct catnip_iflist 	array of struct
- */
-int respondcmd_iflist(int s)
+int msgrecv(int s, void *data, size_t size)
+{
+	int count;
+
+	do {
+		count = read(s, data, size);
+	
+		if (count < 0) {
+			if (errno == EINTR)
+				continue;
+
+			PERROR("read");
+			return -EX_OSERR;
+		}
+	} while (count < 0);
+
+	if (count == 0) {
+		dprintf(STDERR_FILENO, "received EOF, exiting\n");
+		return -EX_DATAERR;
+	}
+	if (count < size) {
+		dprintf(STDERR_FILENO, "could not read in all data, exiting\n");
+		return -EX_DATAERR;
+	}
+
+	return EX_OK;
+}
+
+int respondcmd_iflist(void)
 {
 	struct ifaddrs *ifaddr, *ifa;
+	struct catnip_msg msg;
 	struct catnip_iflist *iflist;
-	uint8_t num;
 	
 	if (getifaddrs(&ifaddr) == -1) {
-		perror("getifaddrs");
-		return errno;
+		PERROR("getifaddrs");
+		return -errno;
 	}
 
-	num = 0;
+	msg.payload.iflist.num = 0;
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
 		int family = ifa->ifa_addr->sa_family;
 
 		if (family != AF_LINK)
 			continue;
 
-		num++;
+		msg.payload.iflist.num++;
 	}
 
-	iflist = alloca(num*sizeof(struct catnip_iflist));
-	memset(iflist, 0, num*sizeof(struct catnip_iflist));
+	if (msg.payload.iflist.num == 0) {
+		dprintf(STDERR_FILENO, "no interfaces available\n");
+		return -EX_NOINPUT;
+	}
 
-	num = 0;
+	iflist = calloc(msg.payload.iflist.num, sizeof(struct catnip_iflist));
+	if (!iflist) {
+		PERROR("malloc");
+		return -EX_OSERR;
+	}
+
+	msg.payload.iflist.num = 0;
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
 		int family = ifa->ifa_addr->sa_family;
 
 		if (family != AF_LINK)
 			continue;
 
-		strncpy(iflist[num].name, ifa->ifa_name,
+		strncpy(iflist[msg.payload.iflist.num].name, ifa->ifa_name,
 				MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
 
 		if (ifa->ifa_flags & IFF_UP)
-			iflist[num].flags |= (1<<CATNIP_IFF_UP);
+			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_UP);
 		if (ifa->ifa_flags & IFF_LOOPBACK)
-			iflist[num].flags |= (1<<CATNIP_IFF_LOOPBACK);
+			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_LOOPBACK);
 		if (ifa->ifa_flags & IFF_POINTOPOINT)
-			iflist[num].flags |= (1<<CATNIP_IFF_POINTOPOINT);
+			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_POINTOPOINT);
 		if (ifa->ifa_flags & IFF_NOARP)
-			iflist[num].flags |= (1<<CATNIP_IFF_NOARP);
+			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_NOARP);
 		if (ifa->ifa_flags & IFF_PROMISC)
-			iflist[num].flags |= (1<<CATNIP_IFF_PROMISC);
+			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_PROMISC);
 
-		num++;
+		msg.payload.iflist.num++;
 	}
 
 	freeifaddrs(ifaddr);
 
-	write(s, &num, 1);
-	write(s, iflist, num*sizeof(struct catnip_iflist));
+	msg.code = CATNIP_MSG_IFLIST;
+	write(STDOUT_FILENO, &msg, sizeof(msg));
+	write(STDOUT_FILENO, iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
+
+	free(iflist);
 
 	return EX_OK;
 }

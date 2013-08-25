@@ -23,13 +23,68 @@
 #include <errno.h>
 #include <ifaddrs.h>
 #include <unistd.h>
+#include <stdio.h>
 
 #include "catnip.h"
 
+extern int verbose;
+
 int main(int argc, char **argv)
 {
-	if (respondcmd_iflist(STDOUT_FILENO))
-		return errno;
+	int rc;
 
-	return EX_OK;
+	rc = parse_args(argc, argv);
+
+	while (rc == EX_OK) {
+		int count;
+		struct catnip_msg msg;
+
+		count = read(STDIN_FILENO, &msg, sizeof(msg));
+		if (count < 0) {
+			if (errno == EINTR)
+				continue;
+
+			PERROR("read");
+			rc = EX_OSERR;
+			break;
+		}
+		if (count == 0) {
+			dprintf(STDERR_FILENO, "received EOF, exiting\n");
+			break;
+		}
+		if (count < sizeof(msg)) {
+			dprintf(STDERR_FILENO, "could not read in whole msg, exiting\n");
+			rc = EX_DATAERR;
+			break;
+		}
+
+		switch (msg.code) {
+		case CATNIP_MSG_IFLIST:
+			dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
+			if (respondcmd_iflist()) {
+				msg.code = CATNIP_MSG_ERROR;
+				msg.payload.error.sysexit = errno;
+				rc = errno;
+				errno = 0;
+				if (write(STDOUT_FILENO, &msg, sizeof(msg)) < 0) {
+					PERROR("write");
+					rc = errno;
+				}
+			}
+			break;
+		default:
+			dprintf(STDERR_FILENO, "unknown code: %d\n", msg.code);
+			msg.code = CATNIP_MSG_ERROR;
+			msg.payload.error.sysexit = EX_PROTOCOL;
+			rc = EX_PROTOCOL;
+			if (write(STDOUT_FILENO, &msg, sizeof(msg)) < 0) {
+				PERROR("write");
+				rc = errno;
+			}
+		}
+	}
+
+	close(STDOUT_FILENO);
+
+	return rc;
 }

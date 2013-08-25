@@ -25,12 +25,27 @@
 #include <ctype.h>
 #include <libgen.h>
 #include <string.h>
+#include <stdbool.h>
+
+#include "catnip.h"
 
 #ifdef DAEMON
 #	define MODE	"daemon"
+#	define GETOPT	"vVh"
 #else
 #	define MODE	"client"
+#	define GETOPT	"H:P:Dps:vVh"
 #endif
+
+#ifndef DAEMON
+char	*hostname	= NULL;
+char	*port		= CATNIP_PORT;
+bool	listif		= 0;
+bool	nopromisc	= 0;
+int	snaplen		= 65535;
+#endif
+
+int	verbose		= 0;
 
 /* http://www.gnu.org/s/libc/manual/html_node/Getopt.html */
 int parse_args(int argc, char **argv)
@@ -41,37 +56,66 @@ int parse_args(int argc, char **argv)
      
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "Vh")) != -1)
+	while ((c = getopt(argc, argv, GETOPT)) != -1)
 	switch (c) {
-/*	case 'w':
-		wpath = optarg;
-		break; */
+#ifndef DAEMON
+	case 'H':
+		hostname = optarg;
+		break;
+	case 'P':
+		port = optarg;
+		break;
+	case 'D':
+		listif = 1;
+		break;
+	case 'p':
+		nopromisc = 1;
+		break;
+	case 's':
+		snaplen = 1;
+		break;
 	case '?':
 		switch (optopt) {
-/*		case 'w':
-			fprintf(stderr, "option -%c requires an argument.\n", optopt);
-			break; */
+		case 'H':
+		case 'P':
+		case 's':
+			dprintf(STDERR_FILENO, "option -%c requires an argument.\n", optopt);
+			break;
 		default:
 			if (isprint(optopt))
-				fprintf(stderr, "unknown option `-%c'.\n", optopt);
+				dprintf(STDERR_FILENO, "unknown option `-%c'.\n", optopt);
 			else
-				fprintf(stderr, "unknown option character `\\x%x'.\n", optopt);
+				dprintf(STDERR_FILENO, "unknown option character `\\x%x'.\n", optopt);
 		}
 		return -EX_USAGE;
+#endif
+	case 'v':
+		verbose++;
+		break;
 	case 'V':
-		printf("%s %s\n\n", basename(argv[0]), VERSION);
-		printf(	"Copyright (C) 2013  Alexander Clouter <alex@digriz.org.uk>\n"
+		dprintf(STDERR_FILENO, "%s %s\n\n", basename(argv[0]), VERSION);
+		dprintf(STDERR_FILENO,
+			"Copyright (C) 2013  Alexander Clouter <alex@digriz.org.uk>\n"
 			"License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n"
 			"This is free software: you are free to change and redistribute it.\n"
 			"There is NO WARRANTY, to the extent permitted by law.\n");
 		return -EX_SOFTWARE;
 	case 'h':
 	default:
-		printf("Usage: %s [options] [(-q|-v)]\n", basename(argv[0]));
-		printf(	"Remote packet mirroring %s with BPF support\n"
+		dprintf(STDERR_FILENO, "Usage: %s [options]\n", basename(argv[0]));
+		dprintf(STDERR_FILENO, "Remote packet mirroring %s with BPF support\n"
+#ifndef DAEMON
 			"\n"
-			"  -q		be quieter\n"
-			"  -v		be more verbose\n"
+			"  -H		host to connect to\n"
+			"  -P		port to connect to (default: " CATNIP_PORT ")\n"
+			"  -D		Print the list of the network interfaces\n"
+			"		available on the system\n"
+			"  -p		Don't put the interface into promiscuous mode\n"
+			"  -s		Snarf snaplen bytes of data from each packet\n"
+			"		rather than the default of 65535 bytes\n"
+#endif
+			"\n"
+			"  -v		increase verbosity\n"
 			"\n"
 			"  -h		display this help and exit\n"
 			"  -V		print version information and exit\n", MODE);
@@ -79,11 +123,19 @@ int parse_args(int argc, char **argv)
 	}
 
 	if (optind != argc) {
-		fprintf(stderr, "we do not accept any arguments\n");
+		dprintf(STDERR_FILENO, "we do not accept any arguments\n");
 		return -EX_USAGE;
 	}
+
+#ifndef DAEMON
+        if (!hostname) {
+		dprintf(STDERR_FILENO, "must supply a host to connect to\n");
+		return -EX_USAGE;
+	}
+#endif
+
 	/* for (index = optind; index < argc; index++)
-		printf("Non-option argument %s\n", argv[index]); */
+		dprintf(STDERR_FILENO, "Non-option argument %s\n", argv[index]); */
 
 	return EX_OK;
 }

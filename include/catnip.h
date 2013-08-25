@@ -20,13 +20,36 @@
  */
 
 #include <stdint.h>
+#include <string.h>
+
+#define PERROR(x)	dprintf(STDERR_FILENO, "%s:%d: %s: %s\n", \
+				__FILE__, __LINE__, x, strerror(errno))
 
 #define MAX(a,b)	((a) > (b) ? a : b)
 #define MIN(a,b)	((a) < (b) ? a : b)
 
+#define	CATNIP_PORT	"34343"
+
+/* message codes */
 enum {
-	CATNIP_CMD_IFLIST,
+	CATNIP_MSG_ERROR,
+	CATNIP_MSG_IFLIST,
 };
+
+struct catnip_msg {
+	uint8_t		code;
+
+	union {
+		struct {
+			uint8_t			sysexit;
+		} error;
+
+		struct {
+			uint8_t			num;
+			/* data of num*catnip_iflist follows */
+		} iflist;
+	}		payload;
+} __attribute__((packed));
 
 enum {
 	CATNIP_IFF_UP,
@@ -43,8 +66,9 @@ struct catnip_iflist {
 	uint8_t	flags;
 } __attribute__((packed));
 
-int parse_args(int argc, char **argv);
+int parse_args(int, char **);
 
-int sendcmd(int, char);
+int msgsend(int, void *, size_t);
+int msgrecv(int, void *, size_t);
 
-int respondcmd_iflist(int);
+int respondcmd_iflist(void);
