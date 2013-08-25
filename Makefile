@@ -31,14 +31,14 @@ else
 	endif
 endif
 
-catnip: catnip.o getopt-client.o cmd.o
+catnip: catnip.o getopt-client.o cmd.o include/*.h
 
-catnipd: catnipd.o getopt-daemon.o cmd.o
+catnipd: catnipd.o getopt-daemon.o cmd.o include/*.h
 
-getopt-client.o: getopt.c
+getopt-client.o: getopt.c include/*.h
 	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude $(FLAGS) -o $@ $<
 
-getopt-daemon.o: getopt.c
+getopt-daemon.o: getopt.c include/*.h
 	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude $(FLAGS) -DDAEMON -o $@ $<
 
 %.o: %.c
