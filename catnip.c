@@ -74,10 +74,6 @@ int hookup(char *hostname, char *port) {
 	return sfd;
 }
 
-//root@edkhil:/home/aclouter# tcpdump -D
-//1.eth0
-//2.any (Pseudo-device that captures on all interfaces)
-//3.lo
 int do_iflist(int s)
 {
 	struct catnip_msg msg = {
