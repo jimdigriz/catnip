@@ -24,10 +24,13 @@
 #include <ifaddrs.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "catnip.h"
 
 extern int	verbose;
+
+char		*auth;
 
 int main(int argc, char **argv)
 {
@@ -35,21 +38,56 @@ int main(int argc, char **argv)
 
 	rc = parse_args(argc, argv);
 
+	auth = getenv("CATNIP_AUTH");
+
 	while (rc == EX_OK) {
 		struct catnip_msg msg;
 
-		rc = msgrecv(STDIN_FILENO, &msg, sizeof(msg));
+		rc = rd(STDIN_FILENO, &msg, sizeof(msg));
 		if (rc)
 			break;
 
+		if (msg.code != CATNIP_MSG_AUTH) {
+			dprintf(STDERR_FILENO, "auth required\n");
+
+			msg.code = CATNIP_MSG_ERROR;
+			msg.payload.error.sysexit = EX_NOPERM;
+			wr(STDOUT_FILENO, &msg, sizeof(msg));
+			rc = EX_NOPERM;
+			break;
+		}
+
 		switch (msg.code) {
+		case CATNIP_MSG_AUTH:
+			dprintf(STDERR_FILENO, "recv CATNIP_MSG_AUTH\n");
+			if (!auth)
+				auth = "\0";
+
+			char *token = crypt(auth, msg.payload.auth.salt);
+			if (strncmp(	token, msg.payload.auth.token,
+					sizeof(msg.payload.auth.token))) {
+				dprintf(STDERR_FILENO, "auth failed\n");
+				msg.code = CATNIP_MSG_ERROR;
+				msg.payload.error.sysexit = EX_NOPERM;
+				wr(STDOUT_FILENO, &msg, sizeof(msg));
+				rc = EX_NOPERM;
+				break;	
+			}
+
+			auth = NULL;
+
+			msg.code = CATNIP_MSG_ERROR;
+			msg.payload.error.sysexit = EX_OK;
+			wr(STDOUT_FILENO, &msg, sizeof(msg));
+
+			break;
 		case CATNIP_MSG_IFLIST:
 			dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
 			if (respondcmd_iflist()) {
 				msg.code = CATNIP_MSG_ERROR;
 				msg.payload.error.sysexit = errno;
 				rc = errno;
-				msgsend(STDOUT_FILENO, &msg, sizeof(msg));
+				wr(STDOUT_FILENO, &msg, sizeof(msg));
 			}
 			break;
 		default:
@@ -57,7 +95,7 @@ int main(int argc, char **argv)
 			msg.code = CATNIP_MSG_ERROR;
 			msg.payload.error.sysexit = EX_PROTOCOL;
 			rc = EX_PROTOCOL;
-			msgsend(STDOUT_FILENO, &msg, sizeof(msg));
+			wr(STDOUT_FILENO, &msg, sizeof(msg));
 		}
 	}
 

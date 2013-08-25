@@ -33,6 +33,7 @@
 /* message codes */
 enum {
 	CATNIP_MSG_ERROR,
+	CATNIP_MSG_AUTH,
 	CATNIP_MSG_IFLIST,
 };
 
@@ -43,6 +44,11 @@ struct catnip_msg {
 		struct {
 			uint8_t			sysexit;
 		} error;
+
+		struct {
+			char			salt[11];
+			char			token[22];
+		} auth;
 
 		struct {
 			uint8_t			num;
@@ -68,7 +74,7 @@ struct catnip_iflist {
 
 int parse_args(int, char **);
 
-int msgsend(int, void *, size_t);
-int msgrecv(int, void *, size_t);
+int wr(int, void *, size_t);
+int rd(int, void *, size_t);
 
 int respondcmd_iflist(void);

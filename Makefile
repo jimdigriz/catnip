@@ -1,5 +1,5 @@
-CFLAGS  = -pipe -pedantic -Wall -std=c99
-#LDFLAGS = 
+CFLAGS  = -pipe -pedantic -Wall -std=c99 -D_XOPEN_SOURCE
+LDFLAGS = -lcrypt
 
 VERSION=$(shell git show -s --pretty=format:"%ci [git commit: %h]")
 

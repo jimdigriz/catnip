@@ -41,7 +41,7 @@
 
 #include "catnip.h"
 
-int msgsend(int s, void *data, size_t size)
+int wr(int s, void *data, size_t size)
 {
 	int count;
 
@@ -69,7 +69,7 @@ int msgsend(int s, void *data, size_t size)
 	return EX_OK;
 }
 
-int msgrecv(int s, void *data, size_t size)
+int rd(int s, void *data, size_t size)
 {
 	int count;
 
