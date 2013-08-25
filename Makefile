@@ -1,5 +1,5 @@
 CFLAGS  = -pipe -pedantic -Wall -std=c99 -D_XOPEN_SOURCE
-LDFLAGS = -lcrypt
+LDFLAGS =
 
 VERSION=$(shell git show -s --pretty=format:"%ci [git commit: %h]")
 
@@ -10,10 +10,11 @@ FLAGS	= -DVERSION="\"$(VERSION)\""
 all: catnip catnipd
 
 ifeq ($(KERNEL), Linux)
-CFLAGS += -D_BSD_SOURCE -D_GNU_SOURCE
-#else ifneq (,$(filter $(KERNEL),FreeBSD NetBSD))
-#	@echo $(KERNEL) untested, expect your pants to explode!
-#CFLAGS += -D__BSD_VISIBLE
+CFLAGS	+= -D_BSD_SOURCE -D_GNU_SOURCE
+LDFLAGS	+= -lcrypt
+else ifneq (,$(filter $(KERNEL),FreeBSD NetBSD Darwin))
+	@echo $(KERNEL) untested, expect your pants to explode!
+CFLAGS	+= -D__BSD_VISIBLE
 else
 	@echo Sorry \'$(KERNEL)\' is not supported
 	@false
@@ -31,14 +32,14 @@ else
 	endif
 endif
 
-catnip: catnip.o getopt-client.o cmd.o include/*.h
+catnip: catnip.o getopt-client.o cmd.o
 
-catnipd: catnipd.o getopt-daemon.o cmd.o include/*.h
+catnipd: catnipd.o getopt-daemon.o cmd.o
 
-getopt-client.o: getopt.c include/*.h
+getopt-client.o: getopt.c
 	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude $(FLAGS) -o $@ $<
 
-getopt-daemon.o: getopt.c include/*.h
+getopt-daemon.o: getopt.c
 	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude $(FLAGS) -DDAEMON -o $@ $<
 
 %.o: %.c

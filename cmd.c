@@ -19,6 +19,14 @@
  * or alternatively visit <http://www.gnu.org/licenses/gpl.html>
  */
 
+#if __linux__
+#	include <netpacket/packet.h>
+#	define AF_LINK AF_PACKET
+#else
+#	include <sys/socket.h>
+#	include <net/if_dl.h>
+#endif
+
 #include <errno.h>
 #include <sysexits.h>
 #include <stdio.h>
@@ -29,15 +37,6 @@
 #include <net/if.h>
 #include <unistd.h>
 #include <stdlib.h>
-
-#ifdef AF_LINK
-#	include <net/if_dl.h>
-#elif __linux__
-#	include <netpacket/packet.h>
-#	define AF_LINK AF_PACKET
-#else
-#	error neither AF_LINK or AF_PACKET available, aborting
-#endif
 
 #include "catnip.h"
 
