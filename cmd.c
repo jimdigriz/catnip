@@ -117,9 +117,9 @@ int respondcmd_iflist(void)
 		msg.payload.iflist.num++;
 	}
 
-	iflist = malloc(msg.payload.iflist.num*sizeof(struct catnip_iflist));
+	iflist = calloc(msg.payload.iflist.num, sizeof(struct catnip_iflist));
 	if (msg.payload.iflist.num && !iflist) {
-		PERROR("malloc");
+		PERROR("calloc");
 		return -EX_OSERR;
 	}
 
