@@ -1,4 +1,5 @@
 KERNEL  = $(shell uname -s)
+LDFLAGS	= -lpthread
 
 CFLAGS  = -pipe -pedantic -Wall -std=c99
 
