@@ -72,7 +72,7 @@ int parse_args(int argc, char **argv)
 		nopromisc = 1;
 		break;
 	case 's':
-		snaplen = 1;
+		snaplen = optarg;
 		break;
 	case '?':
 		switch (optopt) {
