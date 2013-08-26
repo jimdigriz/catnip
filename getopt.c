@@ -53,6 +53,9 @@ int	verbose		= 0;
 int parse_args(int argc, char **argv)
 {
 	int opt;
+#ifndef DAEMON
+	char *end;
+#endif
      
 	opterr = 0;
 
@@ -72,21 +75,14 @@ int parse_args(int argc, char **argv)
 		promisc = 0;
 		break;
 	case 's':
-		/* getopt cannot handle negative values */
-		errno = 0;
-		snaplen = strtoul(optarg, NULL, 10);
-		if (snaplen == ULONG_MAX && errno) {
-			dprintf(STDERR_FILENO, "snaplen must be a positive integer\n");
+		snaplen = strtol(optarg, &end, 10);
+		if (optarg == end || *end != '\0'
+				|| snaplen < 0 || snaplen > 65535) {
+			dprintf(STDERR_FILENO, "invalid snaplen %s\n", optarg);
 			return -EX_USAGE;
-		}
-
-		if (snaplen == 0)
+		} else if (snaplen == 0)
 			snaplen = 65535;
-		else if (snaplen > 65535) {
-			dprintf(STDERR_FILENO, "max snaplen is 65535 bytes\n");
-			return -EX_USAGE;
-		}
-		break;
+                break;
 	case '?':
 		switch (optopt) {
 		case 'H':
