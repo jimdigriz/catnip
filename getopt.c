@@ -72,7 +72,19 @@ int parse_args(int argc, char **argv)
 		promisc = 0;
 		break;
 	case 's':
-		snaplen = optarg;
+		snaplen = strtoul(optarg, NULL, 10);
+		if (snaplen == 0) {
+			if (errno != 0) {
+				fprintf(stderr, "snaplen must be a positive integer.\n");
+				return -EX_USAGE;
+			}
+
+			snaplen = 65535;
+		}
+		if (snaplen > 65535) {
+			fprintf(stderr, "max snaplen is 65535 bytes\n");
+			return -EX_USAGE;
+		}
 		break;
 	case '?':
 		switch (optopt) {
