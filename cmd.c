@@ -117,13 +117,8 @@ int respondcmd_iflist(void)
 		msg.payload.iflist.num++;
 	}
 
-	if (msg.payload.iflist.num == 0) {
-		dprintf(STDERR_FILENO, "no interfaces available\n");
-		return -EX_NOINPUT;
-	}
-
 	iflist = calloc(msg.payload.iflist.num, sizeof(struct catnip_iflist));
-	if (!iflist) {
+	if (msg.payload.iflist.num && !iflist) {
 		PERROR("malloc");
 		return -EX_OSERR;
 	}
@@ -156,7 +151,8 @@ int respondcmd_iflist(void)
 
 	msg.code = CATNIP_MSG_IFLIST;
 	write(STDOUT_FILENO, &msg, sizeof(msg));
-	write(STDOUT_FILENO, iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
+	if (msg.payload.iflist.num)
+		write(STDOUT_FILENO, iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
 
 	free(iflist);
 
