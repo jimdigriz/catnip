@@ -111,7 +111,7 @@ int parse_args(int argc, char **argv)
 			"  -D		Print the list of the network interfaces\n"
 			"		available on the system\n"
 			"  -p		Don't put the interface into promiscuous mode\n"
-			"  -s		Snarf snaplen bytes of data from each packet\n"
+			"  -s SNAPLEN	Snarf snaplen bytes of data from each packet\n"
 			"		rather than the default of 65535 bytes\n"
 #endif
 			"\n"
