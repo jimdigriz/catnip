@@ -10,10 +10,10 @@ FLAGS	= -DVERSION="\"$(VERSION)\""
 all: catnip catnipd
 
 ifeq ($(KERNEL), Linux)
-CFLAGS	+= -D_BSD_SOURCE -D_GNU_SOURCE
+CFLAGS	+= -D_POSIX_C_SOURCE=200809L -D_BSD_SOURCE
 else ifneq (,$(filter $(KERNEL),FreeBSD NetBSD Darwin))
 	@echo $(KERNEL) untested, expect your pants to explode!
-CFLAGS	+= -D__BSD_VISIBLE
+#CFLAGS	+=
 else
 	@echo Sorry \'$(KERNEL)\' is not supported
 	@false
