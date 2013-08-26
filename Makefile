@@ -1,15 +1,17 @@
-CFLAGS  = -pipe -pedantic -Wall -std=c99 -fdata-sections -ffunction-sections
-LDFLAGS = -Wl,--gc-sections
-
-VERSION=$(shell git show -s --pretty=format:"%ci [git commit: %h]")
-
 KERNEL  = $(shell uname -s)
+
+CFLAGS  = -pipe -pedantic -Wall -std=c99
+
+VERSION	= $(shell git show -s --pretty=format:"%ci [git commit: %h]")
 
 FLAGS	= -DVERSION="\"$(VERSION)\""
 
 all: catnip catnipd
 
 ifeq ($(KERNEL), Linux)
+CFLAGS	+= -fdata-sections -ffunction-sections
+LDFLAGS	+= -Wl,--gc-sections
+
 CFLAGS	+= -D_POSIX_C_SOURCE=200809L -D_BSD_SOURCE
 else ifneq (,$(filter $(KERNEL),FreeBSD NetBSD Darwin))
 	@echo $(KERNEL) untested, expect your pants to explode!
