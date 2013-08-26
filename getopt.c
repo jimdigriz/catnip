@@ -41,7 +41,7 @@
 char	*hostname	= NULL;
 char	*port		= CATNIP_PORT;
 bool	listif		= 0;
-bool	nopromisc	= 0;
+bool	promisc		= 1;
 int	snaplen		= 65535;
 #endif
 
@@ -69,7 +69,7 @@ int parse_args(int argc, char **argv)
 		listif = 1;
 		break;
 	case 'p':
-		nopromisc = 1;
+		promisc = 0;
 		break;
 	case 's':
 		snaplen = optarg;

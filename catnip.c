@@ -35,7 +35,7 @@
 extern char	*hostname;
 extern char	*port;
 extern bool	listif;
-extern bool	nopromisc;
+extern bool	promisc;
 extern int	snaplen;
 
 int hookup(char *hostname, char *port) {
