@@ -1,5 +1,5 @@
-CFLAGS  = -pipe -pedantic -Wall -std=c99
-LDFLAGS =
+CFLAGS  = -pipe -pedantic -Wall -std=c99 -fdata-sections -ffunction-sections
+LDFLAGS = -Wl,--gc-sections
 
 VERSION=$(shell git show -s --pretty=format:"%ci [git commit: %h]")
 
