@@ -98,7 +98,7 @@ int do_iflist(int s)
 		return -EX_PROTOCOL;
 	}
 
-	iflist = calloc(msg.payload.iflist.num, sizeof(struct catnip_iflist));
+	iflist = malloc(msg.payload.iflist.num*sizeof(struct catnip_iflist));
 	if (!iflist) {
 		PERROR("malloc");
 		return -EX_OSERR;
