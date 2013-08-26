@@ -24,8 +24,10 @@
 #include <sysexits.h>
 #include <ctype.h>
 #include <libgen.h>
-#include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
 
 #include "catnip.h"
 
@@ -38,11 +40,11 @@
 #endif
 
 #ifndef DAEMON
-char	*hostname	= NULL;
-char	*port		= CATNIP_PORT;
-bool	listif		= 0;
-bool	promisc		= 1;
-int	snaplen		= 65535;
+char		*hostname	= NULL;
+char		*port		= CATNIP_PORT;
+bool		listif		= 0;
+bool		promisc		= 1;
+unsigned int	snaplen		= 65535;
 #endif
 
 int	verbose		= 0;
@@ -50,14 +52,12 @@ int	verbose		= 0;
 /* http://www.gnu.org/s/libc/manual/html_node/Getopt.html */
 int parse_args(int argc, char **argv)
 {
-	extern char *optarg;
-	extern int optind, opterr, optopt;
-	int c;
+	int opt;
      
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, GETOPT)) != -1)
-	switch (c) {
+	while ((opt = getopt(argc, argv, GETOPT)) != -1)
+	switch (opt) {
 #ifndef DAEMON
 	case 'H':
 		hostname = optarg;
@@ -72,17 +72,18 @@ int parse_args(int argc, char **argv)
 		promisc = 0;
 		break;
 	case 's':
+		/* getopt cannot handle negative values */
+		errno = 0;
 		snaplen = strtoul(optarg, NULL, 10);
-		if (snaplen == 0) {
-			if (errno != 0) {
-				fprintf(stderr, "snaplen must be a positive integer.\n");
-				return -EX_USAGE;
-			}
-
-			snaplen = 65535;
+		if (snaplen == ULONG_MAX && errno) {
+			dprintf(STDERR_FILENO, "snaplen must be a positive integer\n");
+			return -EX_USAGE;
 		}
-		if (snaplen > 65535) {
-			fprintf(stderr, "max snaplen is 65535 bytes\n");
+
+		if (snaplen == 0)
+			snaplen = 65535;
+		else if (snaplen > 65535) {
+			dprintf(STDERR_FILENO, "max snaplen is 65535 bytes\n");
 			return -EX_USAGE;
 		}
 		break;
@@ -91,13 +92,13 @@ int parse_args(int argc, char **argv)
 		case 'H':
 		case 'P':
 		case 's':
-			dprintf(STDERR_FILENO, "option -%c requires an argument.\n", optopt);
+			dprintf(STDERR_FILENO, "option -%c requires an argument\n", optopt);
 			break;
 		default:
 			if (isprint(optopt))
-				dprintf(STDERR_FILENO, "unknown option `-%c'.\n", optopt);
+				dprintf(STDERR_FILENO, "unknown option `-%c'\n", optopt);
 			else
-				dprintf(STDERR_FILENO, "unknown option character `\\x%x'.\n", optopt);
+				dprintf(STDERR_FILENO, "unknown option character `\\x%x'\n", optopt);
 		}
 		return -EX_USAGE;
 #endif

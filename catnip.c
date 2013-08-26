@@ -32,11 +32,11 @@
 
 #include "catnip.h"
 
-extern char	*hostname;
-extern char	*port;
-extern bool	listif;
-extern bool	promisc;
-extern int	snaplen;
+extern char		*hostname;
+extern char		*port;
+extern bool		listif;
+extern bool		promisc;
+extern unsigned int	snaplen;
 
 int hookup(char *hostname, char *port) {
 	struct addrinfo hints = {
