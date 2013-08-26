@@ -13,7 +13,7 @@ ifeq ($(KERNEL), Linux)
 CFLAGS	+= -D_POSIX_C_SOURCE=200809L -D_BSD_SOURCE
 else ifneq (,$(filter $(KERNEL),FreeBSD NetBSD Darwin))
 	@echo $(KERNEL) untested, expect your pants to explode!
-#CFLAGS	+=
+CFLAGS	+=
 else
 	@echo Sorry \'$(KERNEL)\' is not supported
 	@false
