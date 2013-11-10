@@ -33,46 +33,45 @@ extern int	verbose;
 int main(int argc, char **argv)
 {
 	int rc;
+	struct catnip_msg msg;
 	struct sock s = {
 		.rfd	= STDIN_FILENO,
 		.wfd	= STDOUT_FILENO,
 	};
 
 	rc = parse_args(argc, argv);
+	if (rc < 0)
+		return -rc;
 
-	while (rc == EX_OK) {
-		struct catnip_msg msg;
+	rc = rd(&s, &msg, sizeof(msg));
+	if (rc)
+		return -rc;
 
-		rc = rd(&s, &msg, sizeof(msg));
-		if (rc)
-			break;
-
-		switch (msg.code) {
-		case CATNIP_MSG_IFLIST:
-			dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
-			if (cmd_iflist(&s, &msg)) {
-				msg.code = CATNIP_MSG_ERROR;
-				msg.payload.error.sysexit = errno;
-				rc = errno;
-				wr(&s, &msg, sizeof(msg));
-			}
-			break;
-		case CATNIP_MSG_MIRROR:
-			dprintf(STDERR_FILENO, "recv CATNIP_MSG_MIRROR\n");
-			if (cmd_mirror(&s, &msg)) {
-				msg.code = CATNIP_MSG_ERROR;
-				msg.payload.error.sysexit = errno;
-				rc = errno;
-				wr(&s, &msg, sizeof(msg));
-			}
-			break;
-		default:
-			dprintf(STDERR_FILENO, "unknown code: %d\n", msg.code);
+	switch (msg.code) {
+	case CATNIP_MSG_IFLIST:
+		dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
+		if (cmd_iflist(&s, &msg)) {
 			msg.code = CATNIP_MSG_ERROR;
-			msg.payload.error.sysexit = EX_PROTOCOL;
-			rc = EX_PROTOCOL;
+			msg.payload.error.sysexit = errno;
+			rc = errno;
 			wr(&s, &msg, sizeof(msg));
 		}
+		break;
+	case CATNIP_MSG_MIRROR:
+		dprintf(STDERR_FILENO, "recv CATNIP_MSG_MIRROR\n");
+		if (cmd_mirror(&s, &msg)) {
+			msg.code = CATNIP_MSG_ERROR;
+			msg.payload.error.sysexit = errno;
+			rc = errno;
+			wr(&s, &msg, sizeof(msg));
+		}
+		break;
+	default:
+		dprintf(STDERR_FILENO, "unknown code: %d\n", msg.code);
+		msg.code = CATNIP_MSG_ERROR;
+		msg.payload.error.sysexit = EX_PROTOCOL;
+		rc = EX_PROTOCOL;
+		wr(&s, &msg, sizeof(msg));
 	}
 
 	close(s.rfd);
