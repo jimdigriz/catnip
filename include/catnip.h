@@ -55,6 +55,7 @@ struct catnip_msg {
 		struct {
 			uint16_t		port;
 			char			interface[CATNIP_IFNAMSIZ];
+			uint8_t			promisc;
 			uint16_t		snaplen;
 			uint16_t		bf_len;
 			/* bf_len*catnip_sock_filter follows */
@@ -83,17 +84,6 @@ struct catnip_sock_filter
 	uint8_t		jf;
 	uint32_t	k;
 } __attribute__((packed));
-
-struct sock_filter {
-	uint16_t	code;
-	uint8_t		jt;
-	uint8_t		jf;
-	uint32_t	k;
-};
-struct sock_fprog {
-	unsigned short		len;
-	struct sock_filter	*filter;
-};
 
 int parse_args(int, char **);
 

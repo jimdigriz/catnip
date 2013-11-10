@@ -145,7 +145,8 @@ int do_capture(struct sock *s) {
 		.code		= CATNIP_MSG_MIRROR,
 		.payload	= {
 			.mirror	= {
-				.snaplen	= snaplen
+				.promisc	= promisc,
+				.snaplen	= snaplen,
 			}
 		}
 	};

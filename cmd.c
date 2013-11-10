@@ -20,12 +20,15 @@
  */
 
 #if __linux__
+#	include <linux/filter.h>
 #	include <netpacket/packet.h>
+#	include <net/ethernet.h>
 #	define AF_LINK AF_PACKET
 #else
 #	include <net/if_dl.h>
 #endif
 
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
@@ -37,7 +40,9 @@
 #include <string.h>
 #include <net/if.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdlib.h>
+#include <sys/select.h>
 
 #include "catnip.h"
 
@@ -160,17 +165,56 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 	return EX_OK;
 }
 
-int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
-{
-	int pfd, i;
-	struct sockaddr addr;
-	socklen_t addrlen = sizeof(addr);
-	struct catnip_sock_filter fpins;
-	struct sock_fprog fp = {
-		.len	= 0,
-	};
+int set_promisc(const int sock, const char *interface, int state) {
+	struct ifreq ifr;
+
+	strncpy(ifr.ifr_name, interface, IFNAMSIZ);
+	if (ioctl(sock, SIOCGIFFLAGS, &ifr) == -1) {
+		PERROR("ioctl[SIOCGIFFLAGS]");
+		return -EX_OSERR;
+	}
+
+	/* if already IFF_PROMISC then do nothing */
+	if (ifr.ifr_flags & IFF_PROMISC)
+		return 0;
+	else {
+		if (state)
+			ifr.ifr_flags |= IFF_PROMISC;
+		else
+			ifr.ifr_flags &= ~IFF_PROMISC;
+
+		if (ioctl(sock, SIOCSIFFLAGS, &ifr) == -1) {
+			PERROR("ioctl[SIOCSIFFLAGS]");
+			return -EX_OSERR;
+		}
+	}
+
+	return 1;
+}
+
+/* alot gleened from http://www.linuxjournal.com/article/4659 */
+int open_sock(struct sock *s, const struct catnip_msg *omsg) {
+	struct ifreq		ifr;
+	struct sockaddr_ll	sa_ll;
+	int			flags, sock;
+	int			sock_type, promisc = omsg->payload.mirror.promisc;
+
+	/* if we are capturing on 'any' then SOCK_RAW is meaningless */
+	sock_type = (omsg->payload.mirror.interface) ? SOCK_RAW : SOCK_DGRAM;
+
+	if ((sock = socket(PF_PACKET, sock_type, htons(ETH_P_ALL))) < 0) {
+		PERROR("socket error");
+		return -EX_OSERR;
+	}
 
 	if (omsg->payload.mirror.bf_len) {
+		struct sock_fprog		fp;
+		struct catnip_sock_filter	fpins;
+		char				drain[1];
+		struct sock_filter		total_insn = BPF_STMT(BPF_RET | BPF_K, 0);
+		struct sock_fprog 		total_fcode = { 1, &total_insn };
+		int				i;
+
 		fp.len = omsg->payload.mirror.bf_len;
 
 		fp.filter = calloc(fp.len, sizeof(struct catnip_sock_filter));
@@ -190,9 +234,86 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 			fp.filter[i].jf		= fpins.jf;
 			fp.filter[i].k		= fpins.k;
 		}
+	
+		/* deal with socket() -> filter() race */
+		if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
+		       		&total_fcode, sizeof(total_fcode)) < 0) {
+			PERROR("setsockopt[SO_ATTACH_FILTER-total]");
+			free(fp.filter);
+			close(sock);
+			return -EX_OSERR;
+		}
+		while (recv(sock, &drain, sizeof(drain), MSG_TRUNC|MSG_DONTWAIT) >= 0)
+			;
+
+		if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER, &fp, sizeof(fp)) < 0) {
+			PERROR("setsockopt[SO_ATTACH_FILTER]");
+			free(fp.filter);
+			close(sock);
+			return -EX_OSERR;
+		}
+
+		free(fp.filter);
 	}
 
-	if (getsockname(STDIN_FILENO, &addr, &addrlen) < 0) {
+	if (omsg->payload.mirror.interface) {
+		strncpy(ifr.ifr_name, omsg->payload.mirror.interface, MIN(IFNAMSIZ,CATNIP_IFNAMSIZ));
+		if (ioctl(sock, SIOCGIFINDEX, &ifr) == -1) {
+			PERROR("ioctl[SIOCGIFINDEX]");
+			close(sock);
+			return -EX_OSERR;
+		}
+
+		memset(&sa_ll, 0, sizeof(sa_ll));
+
+		sa_ll.sll_family	= AF_PACKET;
+		sa_ll.sll_protocol	= htons(ETH_P_ALL);
+		sa_ll.sll_ifindex	= ifr.ifr_ifindex;
+
+		if ((bind(sock, (struct sockaddr *)&sa_ll, sizeof(sa_ll))) == -1) {
+			PERROR("bind");
+			close(sock);
+			return -EX_OSERR;
+		}
+
+		if (promisc) {
+			promisc = set_promisc(sock, omsg->payload.mirror.interface, 1);
+			if (promisc < 0) {
+				close(sock);
+				return -promisc;
+			}
+		}
+	}
+
+	/* select()/poll() manpage says it is safer under Linux to use O_NONBLOCK */
+	if ((flags = fcntl(sock, F_GETFL, 0)) == -1) {
+		PERROR("fcntl[F_GETFL]");
+		close(sock);
+		return -EX_OSERR;
+	}
+	if (fcntl(sock, F_SETFL, flags | O_NONBLOCK) == -1) {
+		PERROR("fcntl[F_SETFL]");
+		close(sock);
+		return -EX_OSERR;
+	}
+
+	return sock;
+}
+
+int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
+{
+	int pfd, cfd, rc;
+	struct sockaddr addr;
+	socklen_t addrlen = sizeof(addr);
+	fd_set rfds, efds;
+	int running = 1;
+	char *buf[64*1024];
+
+	cfd = open_sock(s, omsg);
+	if (cfd < 0)
+		return -cfd;
+
+	if (getsockname(s->rfd, &addr, &addrlen) < 0) {
 		PERROR("getsockname");
 		return -EX_OSERR;
 	}
@@ -212,7 +333,43 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 		return -EX_UNAVAILABLE;
 	}
 
-	free(fp.filter);
+	if (getpeername(s->wfd, &addr, &addrlen) < 0) {
+		PERROR("getsockname");
+		return -EX_OSERR;
+	}
+	if (addr.sa_family == AF_INET) {
+		((struct sockaddr_in*)&addr)->sin_port = omsg->payload.mirror.port;
+	} else {
+		((struct sockaddr_in6*)&addr)->sin6_port = omsg->payload.mirror.port;
+	}
+	if (connect(pfd, &addr, addrlen)) {
+		PERROR("connect");
+		return -EX_UNAVAILABLE;
+	}
+
+	FD_ZERO(&rfds);
+	FD_SET(cfd, &rfds);
+	FD_ZERO(&efds);
+	FD_SET(s->wfd, &efds);
+	FD_SET(cfd, &efds);
+	FD_SET(pfd, &efds);
+	while (running) {
+		rc = select(pfd+1, &rfds, NULL, &efds, NULL);
+
+		if (rc == -1) {
+			if (errno == EINTR)
+				continue;
+
+			PERROR("select");
+			running = 0;
+			continue;
+		}
+
+		if (FD_ISSET(cfd, &rfds)) {
+			rc = read(cfd, buf, 64*1024);
+			send(pfd, buf, rc, 0);
+		}
+	}
 
 	return EX_OK;
 }
