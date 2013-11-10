@@ -367,7 +367,7 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 
 		if (FD_ISSET(cfd, &rfds)) {
 			rc = read(cfd, buf, 64*1024);
-			send(pfd, buf, rc, 0);
+			send(pfd, buf, rc, MSG_DONTWAIT);
 		}
 	}
 
