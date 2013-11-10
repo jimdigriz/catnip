@@ -33,33 +33,37 @@ extern int	verbose;
 int main(int argc, char **argv)
 {
 	int rc;
+	struct sock s = {
+		.rfd	= STDIN_FILENO,
+		.wfd	= STDOUT_FILENO,
+	};
 
 	rc = parse_args(argc, argv);
 
 	while (rc == EX_OK) {
 		struct catnip_msg msg;
 
-		rc = rd(STDIN_FILENO, &msg, sizeof(msg));
+		rc = rd(&s, &msg, sizeof(msg));
 		if (rc)
 			break;
 
 		switch (msg.code) {
 		case CATNIP_MSG_IFLIST:
 			dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
-			if (cmd_iflist(&msg)) {
+			if (cmd_iflist(&s, &msg)) {
 				msg.code = CATNIP_MSG_ERROR;
 				msg.payload.error.sysexit = errno;
 				rc = errno;
-				wr(STDOUT_FILENO, &msg, sizeof(msg));
+				wr(&s, &msg, sizeof(msg));
 			}
 			break;
 		case CATNIP_MSG_MIRROR:
 			dprintf(STDERR_FILENO, "recv CATNIP_MSG_MIRROR\n");
-			if (cmd_mirror(&msg)) {
+			if (cmd_mirror(&s, &msg)) {
 				msg.code = CATNIP_MSG_ERROR;
 				msg.payload.error.sysexit = errno;
 				rc = errno;
-				wr(STDOUT_FILENO, &msg, sizeof(msg));
+				wr(&s, &msg, sizeof(msg));
 			}
 			break;
 		default:
@@ -67,11 +71,12 @@ int main(int argc, char **argv)
 			msg.code = CATNIP_MSG_ERROR;
 			msg.payload.error.sysexit = EX_PROTOCOL;
 			rc = EX_PROTOCOL;
-			wr(STDOUT_FILENO, &msg, sizeof(msg));
+			wr(&s, &msg, sizeof(msg));
 		}
 	}
 
-	close(STDOUT_FILENO);
+	close(s.rfd);
+	close(s.wfd);
 
 	return rc;
 }

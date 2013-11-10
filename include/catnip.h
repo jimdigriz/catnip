@@ -88,7 +88,8 @@ int parse_args(int, char **);
 
 struct sock
 {
-	int		fd;
+	int		rfd;
+	int		wfd;
 	socklen_t	addrlen;
 	struct sockaddr	addr;
 };
@@ -96,5 +97,5 @@ struct sock
 int wr(struct sock *, void *, size_t);
 int rd(struct sock *, void *, size_t);
 
-int cmd_iflist(const struct catnip_msg *);
-int cmd_mirror(const struct catnip_msg *);
+int cmd_iflist(struct sock *, const struct catnip_msg *);
+int cmd_mirror(struct sock *, const struct catnip_msg *);

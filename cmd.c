@@ -23,10 +23,11 @@
 #	include <netpacket/packet.h>
 #	define AF_LINK AF_PACKET
 #else
-#	include <sys/socket.h>
 #	include <net/if_dl.h>
 #endif
 
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <errno.h>
 #include <sysexits.h>
 #include <stdio.h>
@@ -45,7 +46,7 @@ int wr(struct sock *s, void *data, size_t size)
 	int count;
 
 	do {
-		count = write(s->fd, data, size);
+		count = write(s->wfd, data, size);
 
 		if (count < 0) {
 			if (errno == EINTR)
@@ -73,7 +74,7 @@ int rd(struct sock *s, void *data, size_t size)
 	int count;
 
 	do {
-		count = read(s->fd, data, size);
+		count = read(s->rfd, data, size);
 	
 		if (count < 0) {
 			if (errno == EINTR)
@@ -96,7 +97,7 @@ int rd(struct sock *s, void *data, size_t size)
 	return EX_OK;
 }
 
-int cmd_iflist(const struct catnip_msg *omsg)
+int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 {
 	struct ifaddrs *ifaddr, *ifa;
 	struct catnip_msg msg;
@@ -150,16 +151,35 @@ int cmd_iflist(const struct catnip_msg *omsg)
 	freeifaddrs(ifaddr);
 
 	msg.code = CATNIP_MSG_IFLIST;
-	write(STDOUT_FILENO, &msg, sizeof(msg));
+	wr(s, &msg, sizeof(msg));
 	if (msg.payload.iflist.num)
-		write(STDOUT_FILENO, iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
+		wr(s, iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
 
 	free(iflist);
 
 	return EX_OK;
 }
 
-int cmd_mirror(const struct catnip_msg *omsg)
+int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 {
+	int pfd;
+	struct sockaddr addr;
+	socklen_t addrlen = sizeof(addr);
+
+	if (getsockname(STDIN_FILENO, &addr, &addrlen) < 0) {
+		PERROR("getsockname");
+		return -EX_OSERR;
+	}
+
+	pfd = socket(addr.sa_family, SOCK_DGRAM, IPPROTO_UDP);
+	if (pfd < 0) {
+		PERROR("socket");
+		return -EX_UNAVAILABLE;
+	}
+	if (bind(pfd, &addr, addrlen)) {
+		PERROR("bind");
+		return -EX_UNAVAILABLE;
+	}
+
 	return EX_OK;
 }

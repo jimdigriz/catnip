@@ -55,7 +55,7 @@ int hookup(struct sock *s, char *hostname, char *port) {
 		.ai_protocol	= IPPROTO_TCP,
 	};
 	struct addrinfo *result, *rp;
-	int rc = EX_OK;
+	int sfd, rc = EX_OK;
 
 	rc = getaddrinfo(hostname, port, &hints, &result);
 	if (rc != 0) {
@@ -64,15 +64,15 @@ int hookup(struct sock *s, char *hostname, char *port) {
 	}
 
 	for (rp = result; rp != NULL; rp = rp->ai_next) {
-		s->fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
-		if (s->fd == -1)
+		if (sfd == -1)
 			continue;
 
-		if (connect(s->fd, rp->ai_addr, rp->ai_addrlen) != -1)
+		if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
 			break;
 
-		close(s->fd);
+		close(sfd);
 	}
 
 	if (!rp) {
@@ -81,6 +81,8 @@ int hookup(struct sock *s, char *hostname, char *port) {
 		return -EX_UNAVAILABLE;
 	}
 
+	s->rfd		= sfd;
+	s->wfd		= sfd;
 	s->addrlen	= rp->ai_addrlen;
 	memcpy(&s->addr, rp->ai_addr, sizeof(struct sockaddr));
 	if (rp->ai_family == AF_INET) {
@@ -150,7 +152,7 @@ int do_capture(struct sock *s) {
 	pcap_t *p;
 	struct bpf_program fp;
 	struct catnip_sock_filter *fpinsn;
-	int i, pfd, rc;
+	int i, pfd;
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 
@@ -163,8 +165,7 @@ int do_capture(struct sock *s) {
 		PERROR("bind");
 		return -EX_UNAVAILABLE;
 	}
-	rc = getsockname(pfd, &addr, &addrlen);
-	if (rc < 0) {
+	if (getsockname(pfd, &addr, &addrlen) < 0) {
 		PERROR("getsockname");
 		return -EX_OSERR;
 	}
@@ -235,7 +236,8 @@ int main(int argc, char **argv)
 		rc = do_capture(&s);
 	}
 
-	close(s.fd);
+	close(s.rfd);
+	close(s.wfd);
 
 	return -rc;
 }
