@@ -162,13 +162,44 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 
 int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 {
-	int pfd;
+	int pfd, i;
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
+	struct catnip_sock_filter fpins;
+	struct sock_fprog fp = {
+		.len	= 0,
+	};
+
+	if (omsg->payload.mirror.bf_len) {
+		fp.len = omsg->payload.mirror.bf_len;
+
+		fp.filter = calloc(fp.len, sizeof(struct catnip_sock_filter));
+		if (!fp.filter) {
+			PERROR("calloc [fp.filter]");
+			return -EX_OSERR;
+		}
+
+		for (i = 0; i<fp.len; i++) {
+			if (rd(s, &fpins, sizeof(struct catnip_sock_filter)) < 0) {
+				PERROR("unable to rd bf program");
+				return -EX_SOFTWARE;
+			}
+	
+			fp.filter[i].code	= fpins.code;
+			fp.filter[i].jt		= fpins.jt;
+			fp.filter[i].jf		= fpins.jf;
+			fp.filter[i].k		= fpins.k;
+		}
+	}
 
 	if (getsockname(STDIN_FILENO, &addr, &addrlen) < 0) {
 		PERROR("getsockname");
 		return -EX_OSERR;
+	}
+	if (addr.sa_family == AF_INET) {
+		((struct sockaddr_in*)&addr)->sin_port = 0;
+	} else {
+		((struct sockaddr_in6*)&addr)->sin6_port = 0;
 	}
 
 	pfd = socket(addr.sa_family, SOCK_DGRAM, IPPROTO_UDP);
@@ -180,6 +211,8 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 		PERROR("bind");
 		return -EX_UNAVAILABLE;
 	}
+
+	free(fp.filter);
 
 	return EX_OK;
 }

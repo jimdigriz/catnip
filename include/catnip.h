@@ -84,6 +84,17 @@ struct catnip_sock_filter
 	uint32_t	k;
 } __attribute__((packed));
 
+struct sock_filter {
+	uint16_t	code;
+	uint8_t		jt;
+	uint8_t		jf;
+	uint32_t	k;
+};
+struct sock_fprog {
+	unsigned short		len;
+	struct sock_filter	*filter;
+};
+
 int parse_args(int, char **);
 
 struct sock

@@ -193,14 +193,14 @@ int do_capture(struct sock *s) {
 			return -EX_OSERR;
 		}
 
+		msg.payload.mirror.bf_len = fp.bf_len;
+
 		for (i = 0; i<fp.bf_len; i++) {
 			fpinsn[i].code	= fp.bf_insns[i].code;
 			fpinsn[i].jt	= fp.bf_insns[i].jt;
 			fpinsn[i].jf	= fp.bf_insns[i].jf;
 			fpinsn[i].k	= fp.bf_insns[i].k;
 		}
-
-		msg.payload.mirror.bf_len = fp.bf_len;
 
 		pcap_freecode(&fp);
 	} else {
