@@ -35,6 +35,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <pcap.h>
+#include <sys/select.h>
+#include <signal.h>
 
 #include "catnip.h"
 
@@ -46,6 +48,12 @@ extern int		promisc;
 extern unsigned int	snaplen;
 extern int		optimize;
 extern char		*filter;
+
+int running = 1;
+void sighandler(int signum)
+{
+	running = 0;
+}
 
 int hookup(struct sock *s, char *hostname, char *port) {
 	struct addrinfo hints = {
@@ -153,9 +161,12 @@ int do_capture(struct sock *s) {
 	pcap_t *p;
 	struct bpf_program fp;
 	struct catnip_sock_filter *fpinsn;
-	int i, pfd;
+	int i, pfd, rc;
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
+	fd_set rfds;
+	char *buf[64*1024];
+	struct sigaction sigact;
 
 	pfd = socket(s->addr.sa_family, SOCK_DGRAM, IPPROTO_UDP);
 	if (pfd < 0) {
@@ -214,6 +225,36 @@ int do_capture(struct sock *s) {
 
 	if (msg.payload.mirror.bf_len)
 		free(fpinsn);
+
+	sigact.sa_handler = sighandler;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = 0;
+	sigaction(SIGINT, &sigact, NULL);
+
+	FD_ZERO(&rfds);
+	FD_SET(s->rfd, &rfds);
+	FD_SET(pfd, &rfds);
+	while (running) {
+		rc = select(pfd+1, &rfds, NULL, NULL, NULL);
+
+		if (rc == -1) {
+			if (errno == EINTR)
+				continue;
+
+			PERROR("select");
+			running = 0;
+			continue;
+		}
+
+		if (FD_ISSET(s->rfd, &rfds)) {
+			running = 0;
+			continue;
+		}
+
+		if (FD_ISSET(pfd, &rfds)) {
+			rc = read(pfd, buf, 64*1024);
+		}
+	}
 
 	return EX_OK;
 }

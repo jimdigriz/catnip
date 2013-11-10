@@ -305,7 +305,7 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 	int pfd, cfd, rc;
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
-	fd_set rfds, efds;
+	fd_set rfds;
 	int running = 1;
 	char *buf[64*1024];
 
@@ -348,19 +348,21 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 	}
 
 	FD_ZERO(&rfds);
-	FD_SET(cfd, &rfds);
-	FD_ZERO(&efds);
-	FD_SET(s->wfd, &efds);
-	FD_SET(cfd, &efds);
-	FD_SET(pfd, &efds);
 	while (running) {
-		rc = select(pfd+1, &rfds, NULL, &efds, NULL);
+		FD_SET(s->rfd, &rfds);
+		FD_SET(cfd, &rfds);
+		rc = select(cfd+1, &rfds, NULL, NULL, NULL);
 
 		if (rc == -1) {
 			if (errno == EINTR)
 				continue;
 
 			PERROR("select");
+			running = 0;
+			continue;
+		}
+
+		if (FD_ISSET(s->rfd, &rfds)) {
 			running = 0;
 			continue;
 		}
