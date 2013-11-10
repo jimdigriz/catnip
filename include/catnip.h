@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <sys/socket.h>
 
 #define PERROR(x)	dprintf(STDERR_FILENO, "%s:%d: %s: %s\n", \
 				__FILE__, __LINE__, x, strerror(errno))
