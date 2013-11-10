@@ -40,12 +40,12 @@
 
 #include "catnip.h"
 
-int wr(int s, void *data, size_t size)
+int wr(struct sock *s, void *data, size_t size)
 {
 	int count;
 
 	do {
-		count = write(s, data, size);
+		count = write(s->fd, data, size);
 
 		if (count < 0) {
 			if (errno == EINTR)
@@ -68,12 +68,12 @@ int wr(int s, void *data, size_t size)
 	return EX_OK;
 }
 
-int rd(int s, void *data, size_t size)
+int rd(struct sock *s, void *data, size_t size)
 {
 	int count;
 
 	do {
-		count = read(s, data, size);
+		count = read(s->fd, data, size);
 	
 		if (count < 0) {
 			if (errno == EINTR)
@@ -96,7 +96,7 @@ int rd(int s, void *data, size_t size)
 	return EX_OK;
 }
 
-int respondcmd_iflist(void)
+int cmd_iflist(const struct catnip_msg *omsg)
 {
 	struct ifaddrs *ifaddr, *ifa;
 	struct catnip_msg msg;
@@ -156,5 +156,10 @@ int respondcmd_iflist(void)
 
 	free(iflist);
 
+	return EX_OK;
+}
+
+int cmd_mirror(const struct catnip_msg *omsg)
+{
 	return EX_OK;
 }

@@ -35,6 +35,10 @@ else
 endif
 
 catnip: catnip.o getopt-client.o cmd.o
+	$(CROSS_COMPILE)$(CC) $(LDFLAGS) -lpcap $^ -o $@
+ifdef EMBEDDED
+	$(CROSS_COMPILE)strip $@
+endif
 
 catnipd: catnipd.o getopt-daemon.o cmd.o
 

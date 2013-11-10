@@ -24,27 +24,27 @@
 #include <sysexits.h>
 #include <ctype.h>
 #include <libgen.h>
-#include <stdbool.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <limits.h>
+#include <errno.h>
 
 #include "catnip.h"
 
 #ifdef DAEMON
-#	define MODE	"daemon"
 #	define GETOPT	"vVh"
 #else
-#	define MODE	"client"
-#	define GETOPT	"H:P:Dps:vVh"
+#	define GETOPT	"H:P:Di:ps:OvVh"
 #endif
 
 #ifndef DAEMON
 char		*hostname	= NULL;
 char		*port		= CATNIP_PORT;
-bool		listif		= 0;
-bool		promisc		= 1;
+int		listif		= 0;
+char		*interface	= NULL;
+int		promisc		= 1;
 unsigned int	snaplen		= 65535;
+int		optimize	= 1;
+char		*filter		= NULL;
 #endif
 
 int	verbose		= 0;
@@ -55,6 +55,7 @@ int parse_args(int argc, char **argv)
 	int opt;
 #ifndef DAEMON
 	char *end;
+	int index, len = 0;
 #endif
      
 	opterr = 0;
@@ -71,6 +72,9 @@ int parse_args(int argc, char **argv)
 	case 'D':
 		listif = 1;
 		break;
+	case 'i':
+		interface = optarg;
+		break;
 	case 'p':
 		promisc = 0;
 		break;
@@ -82,11 +86,15 @@ int parse_args(int argc, char **argv)
 			return -EX_USAGE;
 		} else if (snaplen == 0)
 			snaplen = 65535;
-                break;
+		break;
+	case 'O':
+		optimize = 0;
+		break;
 	case '?':
 		switch (optopt) {
 		case 'H':
 		case 'P':
+		case 'i':
 		case 's':
 			dprintf(STDERR_FILENO, "option -%c requires an argument\n", optopt);
 			break;
@@ -111,40 +119,60 @@ int parse_args(int argc, char **argv)
 		return -EX_SOFTWARE;
 	case 'h':
 	default:
+#ifdef DAEMON
 		dprintf(STDERR_FILENO, "Usage: %s [options]\n", basename(argv[0]));
-		dprintf(STDERR_FILENO, "Remote packet mirroring %s with BPF support\n"
-#ifndef DAEMON
+		dprintf(STDERR_FILENO, "Remote packet mirroring daemon with BPF support\n"
+#else
+		dprintf(STDERR_FILENO, "Usage: %s [options] [expr]\n", basename(argv[0]));
+		dprintf(STDERR_FILENO, "Remote packet mirroring client with BPF support\n"
 			"\n"
 			"  -H		host to connect to\n"
 			"  -P		port to connect to (default: " CATNIP_PORT ")\n"
 			"  -D		Print the list of the network interfaces\n"
 			"		available on the system\n"
+			"  -i INTERFACE	Listen on interface\n"
 			"  -p		Don't put the interface into promiscuous mode\n"
 			"  -s SNAPLEN	Snarf snaplen bytes of data from each packet\n"
 			"		rather than the default of 65535 bytes\n"
+			"  -O		Do not run the packet-matching code optimizer\n"
 #endif
 			"\n"
 			"  -v		increase verbosity\n"
 			"\n"
 			"  -h		display this help and exit\n"
-			"  -V		print version information and exit\n", MODE);
+			"  -V		print version information and exit\n");
 		return -EX_SOFTWARE;
 	}
 
+#ifdef DAEMON
 	if (optind != argc) {
 		dprintf(STDERR_FILENO, "we do not accept any arguments\n");
 		return -EX_USAGE;
 	}
-
-#ifndef DAEMON
-        if (!hostname) {
+#else
+	if (!hostname) {
 		dprintf(STDERR_FILENO, "must supply a host to connect to\n");
 		return -EX_USAGE;
 	}
-#endif
 
-	/* for (index = optind; index < argc; index++)
-		dprintf(STDERR_FILENO, "Non-option argument %s\n", argv[index]); */
+	/* concat argv array and put it into filter */
+	if (argv[optind]) {
+		for (index = optind; index < argc; index++)
+			len += strlen(argv[index]) + 1;
+
+		filter = calloc(1, len);
+		if (!filter) {
+			PERROR("calloc");
+			return -EX_OSERR;
+		}
+
+		for (index = optind; index < argc; index++) {
+			if (index != optind)
+				filter[strlen(filter)] = ' ';
+			strncpy(filter + strlen(filter), argv[index], strlen(argv[index]));
+		}
+	}
+#endif
 
 	return EX_OK;
 }

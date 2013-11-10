@@ -30,10 +30,13 @@
 
 #define	CATNIP_PORT	"34343"
 
+#define	CATNIP_IFNAMSIZ	10
+
 /* message codes */
 enum {
 	CATNIP_MSG_ERROR,
 	CATNIP_MSG_IFLIST,
+	CATNIP_MSG_MIRROR,
 };
 
 struct catnip_msg {
@@ -48,6 +51,14 @@ struct catnip_msg {
 			uint8_t			num;
 			/* data of num*catnip_iflist follows */
 		} iflist;
+
+		struct {
+			uint16_t		port;
+			char			interface[CATNIP_IFNAMSIZ];
+			uint16_t		snaplen;
+			uint16_t		bf_len;
+			/* bf_len*catnip_sock_filter follows */
+		} mirror;
 	}		payload;
 } __attribute__((packed));
 
@@ -59,16 +70,31 @@ enum {
 	CATNIP_IFF_PROMISC,
 };
 
-#define	CATNIP_IFNAMSIZ	10
-
 struct catnip_iflist {
-	char	name[CATNIP_IFNAMSIZ];
-	uint8_t	flags;
+	char		name[CATNIP_IFNAMSIZ];
+	uint8_t		flags;
+} __attribute__((packed));
+
+/* clone of sock_filter */
+struct catnip_sock_filter
+{
+	uint16_t	code;
+	uint8_t		jt;
+	uint8_t		jf;
+	uint32_t	k;
 } __attribute__((packed));
 
 int parse_args(int, char **);
 
-int wr(int, void *, size_t);
-int rd(int, void *, size_t);
+struct sock
+{
+	int		fd;
+	socklen_t	addrlen;
+	struct sockaddr	addr;
+};
 
-int respondcmd_iflist(void);
+int wr(struct sock *, void *, size_t);
+int rd(struct sock *, void *, size_t);
+
+int cmd_iflist(const struct catnip_msg *);
+int cmd_mirror(const struct catnip_msg *);

@@ -18,6 +18,12 @@
  * or alternatively visit <http://www.gnu.org/licenses/gpl.html>
  */
 
+#ifdef __linux__
+#	include <linux/filter.h>
+#else
+#	include <net/bpf.h>
+#endif
+
 #include <errno.h>
 #include <sysexits.h>
 #include <sys/types.h>
@@ -25,20 +31,23 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <pcap.h>
 
 #include "catnip.h"
 
 extern char		*hostname;
 extern char		*port;
-extern bool		listif;
-extern bool		promisc;
+extern int		listif;
+extern char		*interface;
+extern int		promisc;
 extern unsigned int	snaplen;
+extern int		optimize;
+extern char		*filter;
 
-int hookup(char *hostname, char *port) {
+int hookup(struct sock *s, char *hostname, char *port) {
 	struct addrinfo hints = {
 		.ai_family	= AF_UNSPEC,
 		.ai_socktype	= SOCK_STREAM,
@@ -46,37 +55,46 @@ int hookup(char *hostname, char *port) {
 		.ai_protocol	= IPPROTO_TCP,
 	};
 	struct addrinfo *result, *rp;
-	int sfd, s;
+	int rc = EX_OK;
 
-	s = getaddrinfo(hostname, port, &hints, &result);
-	if (s != 0) {
+	rc = getaddrinfo(hostname, port, &hints, &result);
+	if (rc != 0) {
 		PERROR("getaddrinfo");
 		return -EX_NOHOST;
 	}
 
 	for (rp = result; rp != NULL; rp = rp->ai_next) {
-		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		s->fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
-		if (sfd == -1)
+		if (s->fd == -1)
 			continue;
 
-		if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
+		if (connect(s->fd, rp->ai_addr, rp->ai_addrlen) != -1)
 			break;
 
-		close(sfd);
+		close(s->fd);
 	}
 
 	if (!rp) {
 		PERROR("socket/connect");
+		freeaddrinfo(result);
 		return -EX_UNAVAILABLE;
+	}
+
+	s->addrlen	= rp->ai_addrlen;
+	memcpy(&s->addr, rp->ai_addr, sizeof(struct sockaddr));
+	if (rp->ai_family == AF_INET) {
+		((struct sockaddr_in*)&s->addr)->sin_port = 0;
+	} else {
+		((struct sockaddr_in6*)&s->addr)->sin6_port = 0;
 	}
 
 	freeaddrinfo(result);
 
-	return sfd;
+	return EX_OK;
 }
 
-int do_iflist(int s)
+int do_iflist(struct sock *s)
 {
 	struct catnip_msg msg = {
 		.code	= CATNIP_MSG_IFLIST,
@@ -120,26 +138,104 @@ int do_iflist(int s)
 	return EX_OK;
 }
 
+int do_capture(struct sock *s) {
+	struct catnip_msg msg = {
+		.code		= CATNIP_MSG_MIRROR,
+		.payload	= {
+			.mirror	= {
+				.snaplen	= snaplen
+			}
+		}
+	};
+	pcap_t *p;
+	struct bpf_program fp;
+	struct catnip_sock_filter *fpinsn;
+	int i, pfd, rc;
+	struct sockaddr addr;
+	socklen_t addrlen = sizeof(addr);
+
+	pfd = socket(s->addr.sa_family, SOCK_DGRAM, IPPROTO_UDP);
+	if (pfd < 0) {
+		PERROR("socket");
+		return -EX_UNAVAILABLE;
+	}
+	if (bind(pfd, &s->addr, s->addrlen)) {
+		PERROR("bind");
+		return -EX_UNAVAILABLE;
+	}
+	rc = getsockname(pfd, &addr, &addrlen);
+	if (rc < 0) {
+		PERROR("getsockname");
+		return -EX_OSERR;
+	}
+	msg.payload.mirror.port = (s->addr.sa_family == AF_INET)
+		? (((struct sockaddr_in*)&addr)->sin_port)
+		: (((struct sockaddr_in6*)&addr)->sin6_port);
+
+	strncpy(msg.payload.mirror.interface, interface, CATNIP_IFNAMSIZ);
+
+	if (filter) {
+		p = pcap_open_dead(DLT_NULL, snaplen);
+
+		if (pcap_compile(p, &fp, filter, optimize, PCAP_NETMASK_UNKNOWN) == -1) {
+			dprintf(STDERR_FILENO, "pcap_perror: %s\n", pcap_geterr(p));
+			pcap_close(p);
+			return -EX_DATAERR;
+		}
+
+		pcap_close(p);
+		
+		fpinsn = calloc(fp.bf_len, sizeof(struct catnip_sock_filter));
+		if (!fpinsn) {
+			PERROR("calloc");
+			pcap_freecode(&fp);
+			return -EX_OSERR;
+		}
+
+		for (i = 0; i<fp.bf_len; i++) {
+			fpinsn[i].code	= fp.bf_insns[i].code;
+			fpinsn[i].jt	= fp.bf_insns[i].jt;
+			fpinsn[i].jf	= fp.bf_insns[i].jf;
+			fpinsn[i].k	= fp.bf_insns[i].k;
+		}
+
+		msg.payload.mirror.bf_len = fp.bf_len;
+
+		pcap_freecode(&fp);
+	} else {
+		msg.payload.mirror.bf_len = 0;
+	}
+
+	wr(s, &msg, sizeof(msg));
+	if (msg.payload.mirror.bf_len)
+		wr(s, fpinsn, msg.payload.mirror.bf_len*sizeof(struct catnip_sock_filter));
+
+	if (msg.payload.mirror.bf_len)
+		free(fpinsn);
+
+	return EX_OK;
+}
+
 int main(int argc, char **argv)
 {
 	int rc;
-	int s;
+	struct sock s;
 
 	rc = parse_args(argc, argv);
 	if (rc)
 		return rc;
 
-	s = hookup(hostname, port);
-	if (s < 0)
-		return -s;
+	rc = hookup(&s, hostname, port);
+	if (rc < 0)
+		return -rc;
 
 	if (listif) {
-		rc = do_iflist(s);
+		rc = do_iflist(&s);
+	} else {
+		rc = do_capture(&s);
 	}
 
-	if (s > 0)
-		close(s);
+	close(s.fd);
 
-	return rc;
+	return -rc;
 }
-

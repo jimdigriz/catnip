@@ -46,7 +46,16 @@ int main(int argc, char **argv)
 		switch (msg.code) {
 		case CATNIP_MSG_IFLIST:
 			dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
-			if (respondcmd_iflist()) {
+			if (cmd_iflist(&msg)) {
+				msg.code = CATNIP_MSG_ERROR;
+				msg.payload.error.sysexit = errno;
+				rc = errno;
+				wr(STDOUT_FILENO, &msg, sizeof(msg));
+			}
+			break;
+		case CATNIP_MSG_MIRROR:
+			dprintf(STDERR_FILENO, "recv CATNIP_MSG_MIRROR\n");
+			if (cmd_mirror(&msg)) {
 				msg.code = CATNIP_MSG_ERROR;
 				msg.payload.error.sysexit = errno;
 				rc = errno;
