@@ -73,6 +73,9 @@ int main(int argc, char **argv)
 		rc = EX_PROTOCOL;
 		wr(&s, &msg, sizeof(msg));
 	}
+	
+	/* need to deal with thie better one day */
+	while (rd(&s, &msg, 1) > 0) { }
 
 	close(s.rfd);
 	close(s.wfd);
