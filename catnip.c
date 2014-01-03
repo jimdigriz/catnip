@@ -209,10 +209,10 @@ int do_capture(struct sock *s) {
 		msg.payload.mirror.bf_len = fp.bf_len;
 
 		for (i = 0; i<fp.bf_len; i++) {
-			fpinsn[i].code	= fp.bf_insns[i].code;
+			fpinsn[i].code	= htons(fp.bf_insns[i].code);
 			fpinsn[i].jt	= fp.bf_insns[i].jt;
 			fpinsn[i].jf	= fp.bf_insns[i].jf;
-			fpinsn[i].k	= fp.bf_insns[i].k;
+			fpinsn[i].k	= htonl(fp.bf_insns[i].k);
 		}
 
 		pcap_freecode(&fp);

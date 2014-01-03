@@ -261,10 +261,10 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 				return -EX_SOFTWARE;
 			}
 	
-			fp.filter[i].code	= fpins.code;
+			fp.filter[i].code	= ntohs(fpins.code);
 			fp.filter[i].jt		= fpins.jt;
 			fp.filter[i].jf		= fpins.jf;
-			fp.filter[i].k		= fpins.k;
+			fp.filter[i].k		= ntohl(fpins.k);
 		}
 	
 		/* deal with socket() -> filter() race */
