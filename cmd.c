@@ -51,7 +51,7 @@ int wr(struct sock *s, void *data, size_t size)
 	int count;
 
 	do {
-		count = write(s->wfd, data, size);
+		count = write(s->fd, data, size);
 
 		if (count < 0) {
 			if (errno == EINTR)
@@ -79,7 +79,7 @@ int rd(struct sock *s, void *data, size_t size)
 	int count;
 
 	do {
-		count = read(s->rfd, data, size);
+		count = read(s->fd, data, size);
 	
 		if (count < 0) {
 			if (errno == EINTR)
@@ -313,7 +313,7 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 	if (cfd < 0)
 		return -cfd;
 
-	if (getsockname(s->rfd, &addr, &addrlen) < 0) {
+	if (getsockname(s->fd, &addr, &addrlen) < 0) {
 		PERROR("getsockname");
 		return -EX_OSERR;
 	}
@@ -333,7 +333,7 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 		return -EX_UNAVAILABLE;
 	}
 
-	if (getpeername(s->wfd, &addr, &addrlen) < 0) {
+	if (getpeername(s->fd, &addr, &addrlen) < 0) {
 		PERROR("getsockname");
 		return -EX_OSERR;
 	}
@@ -349,7 +349,7 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 
 	FD_ZERO(&rfds);
 	while (running) {
-		FD_SET(s->rfd, &rfds);
+		FD_SET(s->fd, &rfds);
 		FD_SET(cfd, &rfds);
 		rc = select(cfd+1, &rfds, NULL, NULL, NULL);
 
@@ -362,7 +362,7 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 			continue;
 		}
 
-		if (FD_ISSET(s->rfd, &rfds)) {
+		if (FD_ISSET(s->fd, &rfds)) {
 			running = 0;
 			continue;
 		}

@@ -63,7 +63,7 @@ int hookup(struct sock *s, char *hostname, char *port) {
 		.ai_protocol	= IPPROTO_TCP,
 	};
 	struct addrinfo *result, *rp;
-	int sfd, rc = EX_OK;
+	int rc = EX_OK;
 
 	rc = getaddrinfo(hostname, port, &hints, &result);
 	if (rc != 0) {
@@ -72,15 +72,15 @@ int hookup(struct sock *s, char *hostname, char *port) {
 	}
 
 	for (rp = result; rp != NULL; rp = rp->ai_next) {
-		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		s->fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
-		if (sfd == -1)
+		if (s->fd == -1)
 			continue;
 
-		if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
+		if (connect(s->fd, rp->ai_addr, rp->ai_addrlen) != -1)
 			break;
 
-		close(sfd);
+		close(s->fd);
 	}
 
 	if (!rp) {
@@ -89,9 +89,7 @@ int hookup(struct sock *s, char *hostname, char *port) {
 		return -EX_UNAVAILABLE;
 	}
 
-	s->rfd		= sfd;
-	s->wfd		= sfd;
-	s->addrlen	= rp->ai_addrlen;
+	s->addrlen = rp->ai_addrlen;
 	memcpy(&s->addr, rp->ai_addr, sizeof(struct sockaddr));
 	if (rp->ai_family == AF_INET) {
 		((struct sockaddr_in*)&s->addr)->sin_port = 0;
@@ -232,7 +230,7 @@ int do_capture(struct sock *s) {
 	sigaction(SIGINT, &sigact, NULL);
 
 	FD_ZERO(&rfds);
-	FD_SET(s->rfd, &rfds);
+	FD_SET(s->fd, &rfds);
 	FD_SET(pfd, &rfds);
 	while (running) {
 		rc = select(pfd+1, &rfds, NULL, NULL, NULL);
@@ -246,7 +244,7 @@ int do_capture(struct sock *s) {
 			continue;
 		}
 
-		if (FD_ISSET(s->rfd, &rfds)) {
+		if (FD_ISSET(s->fd, &rfds)) {
 			running = 0;
 			continue;
 		}
@@ -278,8 +276,7 @@ int main(int argc, char **argv)
 		rc = do_capture(&s);
 	}
 
-	close(s.rfd);
-	close(s.wfd);
+	close(s.fd);
 
 	return -rc;
 }

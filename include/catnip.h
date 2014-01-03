@@ -90,8 +90,7 @@ int parse_args(int, char **);
 
 struct sock
 {
-	int		rfd;
-	int		wfd;
+	int		fd;
 	socklen_t	addrlen;
 	struct sockaddr	addr;
 };

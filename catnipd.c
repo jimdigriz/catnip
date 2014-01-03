@@ -35,8 +35,7 @@ int main(int argc, char **argv)
 	int rc;
 	struct catnip_msg msg;
 	struct sock s = {
-		.rfd	= STDIN_FILENO,
-		.wfd	= STDOUT_FILENO,
+		.fd	= STDIN_FILENO,
 	};
 
 	rc = parse_args(argc, argv);
@@ -77,8 +76,7 @@ int main(int argc, char **argv)
 	/* need to deal with thie better one day */
 	while (rd(&s, &msg, 1) > 0) { }
 
-	close(s.rfd);
-	close(s.wfd);
+	close(s.fd);
 
 	return rc;
 }
