@@ -223,10 +223,10 @@ int do_capture(struct sock *s) {
 	pcap_freecode(&fp);
 
 	wr(s, &msg, sizeof(msg));
-	if (msg.payload.mirror.bf_len)
-		wr(s, fpinsn, msg.payload.mirror.bf_len*sizeof(struct catnip_sock_filter));
+	if (fp.bf_len)
+		wr(s, fpinsn, fp.bf_len*sizeof(struct catnip_sock_filter));
 
-	if (msg.payload.mirror.bf_len)
+	if (fp.bf_len)
 		free(fpinsn);
 
 	sigact.sa_handler = sighandler;
