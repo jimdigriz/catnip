@@ -48,8 +48,32 @@
 
 extern int	verbose;
 
+int get_arphrd_type(char *ifname) {
+	int s;
+	struct ifreq ifr;
+
+	s = socket(AF_INET, SOCK_DGRAM, 0);
+	if (s < 0) {
+		PERROR("socket");
+		return -EX_OSERR;
+	}
+
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.ifr_name, ifname,
+			MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
+	if (ioctl(s, SIOCGIFHWADDR, &ifr) == -1) {
+		PERROR("ioctl[SIOCGIFHWADDR]");
+		close(s);
+		return -EX_OSERR;
+	}
+
+	close(s);
+
+	return ifr.ifr_hwaddr.sa_family;
+}
+
 /* from libpcap/pcap-linux.c */
-uint8_t map_arphrd_to_dlt(int arptype)
+int map_arphrd_to_dlt(int arptype)
 {
 	switch (arptype) {
 	case ARPHRD_ETHER:
@@ -72,7 +96,6 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 	struct ifaddrs *ifaddr, *ifa;
 	struct catnip_msg msg;
 	struct catnip_iflist *iflist;
-	struct ifreq ifr;
 	
 	if (getifaddrs(&ifaddr) == -1) {
 		PERROR("getifaddrs");
@@ -100,6 +123,7 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 
 	msg.payload.iflist.num = 0;
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+		int type;
 		int family = ifa->ifa_addr->sa_family;
 
 		if (family != AF_LINK)
@@ -111,15 +135,8 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 		strncpy(iflist[msg.payload.iflist.num].name, ifa->ifa_name,
 				MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
 
-		memset(&ifr, 0, sizeof(ifr));
-		strncpy(ifr.ifr_name, ifa->ifa_name,
-				MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
-		if (ioctl(s->fd, SIOCGIFHWADDR, &ifr) == -1) {
-			PERROR("ioctl[SIOCGIFHWADDR]");
-			return -EX_OSERR;
-		}
-		iflist[msg.payload.iflist.num].type
-			= map_arphrd_to_dlt(ifr.ifr_hwaddr.sa_family);
+		type = get_arphrd_type(ifa->ifa_name);
+		iflist[msg.payload.iflist.num].type = map_arphrd_to_dlt(type);
 
 		if (ifa->ifa_flags & IFF_PROMISC)
 			iflist[msg.payload.iflist.num].flags |= IFF_PROMISC;
