@@ -220,14 +220,12 @@ int do_capture(struct sock *s) {
 		fpinsn[i].k	= htonl(fp.bf_insns[i].k);
 	}
 
-	pcap_freecode(&fp);
-
 	wr(s, &msg, sizeof(msg));
-	if (fp.bf_len)
-		wr(s, fpinsn, fp.bf_len*sizeof(struct catnip_sock_filter));
+	wr(s, fpinsn, fp.bf_len*sizeof(struct catnip_sock_filter));
 
-	if (fp.bf_len)
-		free(fpinsn);
+	free(fpinsn);
+
+	pcap_freecode(&fp);
 
 	sigact.sa_handler = sighandler;
 	sigemptyset(&sigact.sa_mask);
