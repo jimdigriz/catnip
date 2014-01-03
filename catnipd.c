@@ -193,7 +193,6 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 	int			flags, sock;
 	int			sock_type;
 	int			promisc = omsg->payload.mirror.promisc;
-	int			snaplen = ntohs(omsg->payload.mirror.snaplen);
 
 	/* if we are capturing on 'any' then SOCK_RAW is meaningless */
 	sock_type = (omsg->payload.mirror.interface) ? SOCK_RAW : SOCK_DGRAM;

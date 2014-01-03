@@ -157,7 +157,6 @@ int do_capture(struct sock *s) {
 		.payload	= {
 			.mirror	= {
 				.promisc	= promisc,
-				.snaplen	= htons(snaplen),
 			}
 		}
 	};

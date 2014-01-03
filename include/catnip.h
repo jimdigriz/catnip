@@ -57,7 +57,6 @@ struct catnip_msg {
 			uint16_t		port;
 			char			interface[CATNIP_IFNAMSIZ];
 			uint8_t			promisc;
-			uint16_t		snaplen;
 			uint16_t		bf_len;
 			/* bf_len*catnip_sock_filter follows */
 		} mirror;
