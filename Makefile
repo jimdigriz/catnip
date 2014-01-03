@@ -34,13 +34,13 @@ else
 	endif
 endif
 
-catnip: catnip.o getopt-client.o cmd.o
+catnip: catnip.o getopt-client.o common.o
 	$(CROSS_COMPILE)$(CC) $(LDFLAGS) -lpcap $^ -o $@
 ifdef EMBEDDED
 	$(CROSS_COMPILE)strip $@
 endif
 
-catnipd: catnipd.o getopt-daemon.o cmd.o
+catnipd: catnipd.o getopt-daemon.o common.o
 
 getopt-client.o: getopt.c
 	$(CROSS_COMPILE)$(CC) -c $(CFLAGS) -Iinclude $(FLAGS) -o $@ $<
