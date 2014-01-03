@@ -189,37 +189,33 @@ int do_capture(struct sock *s) {
 
 	strncpy(msg.payload.mirror.interface, interface, CATNIP_IFNAMSIZ);
 
-	if (filter) {
-		p = pcap_open_dead(DLT_NULL, snaplen);
+	p = pcap_open_dead(DLT_NULL, snaplen);
 
-		if (pcap_compile(p, &fp, filter, optimize, PCAP_NETMASK_UNKNOWN) == -1) {
-			dprintf(STDERR_FILENO, "pcap_perror: %s\n", pcap_geterr(p));
-			pcap_close(p);
-			return -EX_DATAERR;
-		}
-
+	if (pcap_compile(p, &fp, filter, optimize, PCAP_NETMASK_UNKNOWN) == -1) {
+		dprintf(STDERR_FILENO, "pcap_perror: %s\n", pcap_geterr(p));
 		pcap_close(p);
-		
-		fpinsn = calloc(fp.bf_len, sizeof(struct catnip_sock_filter));
-		if (!fpinsn) {
-			PERROR("calloc");
-			pcap_freecode(&fp);
-			return -EX_OSERR;
-		}
-
-		msg.payload.mirror.bf_len = htons(fp.bf_len);
-
-		for (i = 0; i<fp.bf_len; i++) {
-			fpinsn[i].code	= htons(fp.bf_insns[i].code);
-			fpinsn[i].jt	= fp.bf_insns[i].jt;
-			fpinsn[i].jf	= fp.bf_insns[i].jf;
-			fpinsn[i].k	= htonl(fp.bf_insns[i].k);
-		}
-
-		pcap_freecode(&fp);
-	} else {
-		msg.payload.mirror.bf_len = 0;
+		return -EX_DATAERR;
 	}
+
+	pcap_close(p);
+		
+	fpinsn = calloc(fp.bf_len, sizeof(struct catnip_sock_filter));
+	if (!fpinsn) {
+		PERROR("calloc");
+		pcap_freecode(&fp);
+		return -EX_OSERR;
+	}
+
+	msg.payload.mirror.bf_len = htons(fp.bf_len);
+
+	for (i = 0; i<fp.bf_len; i++) {
+		fpinsn[i].code	= htons(fp.bf_insns[i].code);
+		fpinsn[i].jt	= fp.bf_insns[i].jt;
+		fpinsn[i].jf	= fp.bf_insns[i].jf;
+		fpinsn[i].k	= htonl(fp.bf_insns[i].k);
+	}
+
+	pcap_freecode(&fp);
 
 	wr(s, &msg, sizeof(msg));
 	if (msg.payload.mirror.bf_len)
