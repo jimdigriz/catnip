@@ -155,7 +155,7 @@ int do_capture(struct sock *s) {
 		.payload	= {
 			.mirror	= {
 				.promisc	= promisc,
-				.snaplen	= snaplen,
+				.snaplen	= htons(snaplen),
 			}
 		}
 	};
@@ -183,8 +183,8 @@ int do_capture(struct sock *s) {
 		return -EX_OSERR;
 	}
 	msg.payload.mirror.port = (s->addr.sa_family == AF_INET)
-		? (((struct sockaddr_in*)&addr)->sin_port)
-		: (((struct sockaddr_in6*)&addr)->sin6_port);
+		? htons((((struct sockaddr_in*)&addr)->sin_port))
+		: htons((((struct sockaddr_in6*)&addr)->sin6_port));
 
 	strncpy(msg.payload.mirror.interface, interface, CATNIP_IFNAMSIZ);
 
@@ -206,7 +206,7 @@ int do_capture(struct sock *s) {
 			return -EX_OSERR;
 		}
 
-		msg.payload.mirror.bf_len = fp.bf_len;
+		msg.payload.mirror.bf_len = htons(fp.bf_len);
 
 		for (i = 0; i<fp.bf_len; i++) {
 			fpinsn[i].code	= htons(fp.bf_insns[i].code);

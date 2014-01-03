@@ -229,7 +229,9 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 	struct ifreq		ifr;
 	struct sockaddr_ll	sa_ll;
 	int			flags, sock;
-	int			sock_type, promisc = omsg->payload.mirror.promisc;
+	int			sock_type;
+	int			promisc = omsg->payload.mirror.promisc;
+	int			snaplen = ntohs(omsg->payload.mirror.snaplen);
 
 	/* if we are capturing on 'any' then SOCK_RAW is meaningless */
 	sock_type = (omsg->payload.mirror.interface) ? SOCK_RAW : SOCK_DGRAM;
@@ -247,7 +249,7 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 		struct sock_fprog 		total_fcode = { 1, &total_insn };
 		int				i;
 
-		fp.len = omsg->payload.mirror.bf_len;
+		fp.len = ntohs(omsg->payload.mirror.bf_len);
 
 		fp.filter = calloc(fp.len, sizeof(struct catnip_sock_filter));
 		if (!fp.filter) {
