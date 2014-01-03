@@ -184,8 +184,8 @@ int do_capture(struct sock *s) {
 		return -EX_OSERR;
 	}
 	msg.payload.mirror.port = (s->addr.sa_family == AF_INET)
-		? htons((((struct sockaddr_in*)&addr)->sin_port))
-		: htons((((struct sockaddr_in6*)&addr)->sin6_port));
+		? htons(((struct sockaddr_in*)&addr)->sin_port)
+		: htons(((struct sockaddr_in6*)&addr)->sin6_port);
 
 	strncpy(msg.payload.mirror.interface, interface, CATNIP_IFNAMSIZ);
 
