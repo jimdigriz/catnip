@@ -64,17 +64,9 @@ struct catnip_msg {
 	}		payload;
 } __attribute__((packed));
 
-enum {
-	CATNIP_IFF_UP,
-	CATNIP_IFF_LOOPBACK,
-	CATNIP_IFF_POINTOPOINT,
-	CATNIP_IFF_NOARP,
-	CATNIP_IFF_PROMISC,
-};
-
 struct catnip_iflist {
 	char		name[CATNIP_IFNAMSIZ];
-	uint8_t		flags;
+	uint32_t	flags;
 } __attribute__((packed));
 
 /* clone of sock_filter */

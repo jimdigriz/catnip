@@ -120,6 +120,9 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 		if (family != AF_LINK)
 			continue;
 
+		if (!(ifa->ifa_flags & IFF_UP))
+			continue;
+
 		msg.payload.iflist.num++;
 	}
 
@@ -136,19 +139,17 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 		if (family != AF_LINK)
 			continue;
 
+		if (!(ifa->ifa_flags & IFF_UP))
+			continue;
+
 		strncpy(iflist[msg.payload.iflist.num].name, ifa->ifa_name,
 				MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
 
-		if (ifa->ifa_flags & IFF_UP)
-			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_UP);
-		if (ifa->ifa_flags & IFF_LOOPBACK)
-			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_LOOPBACK);
-		if (ifa->ifa_flags & IFF_POINTOPOINT)
-			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_POINTOPOINT);
-		if (ifa->ifa_flags & IFF_NOARP)
-			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_NOARP);
 		if (ifa->ifa_flags & IFF_PROMISC)
-			iflist[msg.payload.iflist.num].flags |= (1<<CATNIP_IFF_PROMISC);
+			iflist[msg.payload.iflist.num].flags |= IFF_PROMISC;
+
+		iflist[msg.payload.iflist.num].flags
+				= htonl(iflist[msg.payload.iflist.num].flags);
 
 		msg.payload.iflist.num++;
 	}
