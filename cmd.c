@@ -103,6 +103,7 @@ int rd(struct sock *s, void *data, size_t size)
 	return EX_OK;
 }
 
+/* from libpcap/pcap-linux.c */
 uint8_t map_arphrd_to_dlt(int arptype)
 {
 	switch (arptype) {
