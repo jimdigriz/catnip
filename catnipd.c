@@ -390,24 +390,27 @@ int main(int argc, char **argv)
 	switch (msg.code) {
 	case CATNIP_MSG_IFLIST:
 		dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
-		if (cmd_iflist(&s, &msg)) {
+		rc = cmd_iflist(&s, &msg);
+		if (rc) {
+			memset(&msg, 0, sizeof(msg));
 			msg.code = CATNIP_MSG_ERROR;
-			msg.payload.error.sysexit = errno;
-			rc = errno;
+			msg.payload.error.sysexit = rc;
 			wr(&s, &msg, sizeof(msg));
 		}
 		break;
 	case CATNIP_MSG_MIRROR:
 		dprintf(STDERR_FILENO, "recv CATNIP_MSG_MIRROR\n");
-		if (cmd_mirror(&s, &msg)) {
+		rc = cmd_mirror(&s, &msg);
+		if (rc) {
+			memset(&msg, 0, sizeof(msg));
 			msg.code = CATNIP_MSG_ERROR;
-			msg.payload.error.sysexit = errno;
-			rc = errno;
+			msg.payload.error.sysexit = rc;
 			wr(&s, &msg, sizeof(msg));
 		}
 		break;
 	default:
 		dprintf(STDERR_FILENO, "unknown code: %d\n", msg.code);
+		memset(&msg, 0, sizeof(msg));
 		msg.code = CATNIP_MSG_ERROR;
 		msg.payload.error.sysexit = EX_PROTOCOL;
 		rc = EX_PROTOCOL;

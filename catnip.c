@@ -119,6 +119,11 @@ int do_iflist(struct sock *s)
 	if (rc)
 		return -rc;
 
+	if (msg.code == CATNIP_MSG_ERROR) {
+		dprintf(STDERR_FILENO, "error: sysexit code %d\n", msg.payload.error.sysexit);
+		return -EX_SOFTWARE;
+	}
+
 	if (msg.code != CATNIP_MSG_IFLIST) {
 		dprintf(STDERR_FILENO, "response is different msg.code\n");
 		return -EX_PROTOCOL;
@@ -246,6 +251,16 @@ int do_capture(struct sock *s) {
 
 		if (FD_ISSET(s->fd, &rfds)) {
 			running = 0;
+
+			rc = rd(s, &msg, sizeof(msg));
+			if (rc)
+				return -rc;
+
+			if (msg.code == CATNIP_MSG_ERROR) {
+				dprintf(STDERR_FILENO, "error: sysexit code %d\n", msg.payload.error.sysexit);
+				return -EX_SOFTWARE;
+			}
+
 			continue;
 		}
 
