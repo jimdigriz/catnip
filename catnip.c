@@ -130,10 +130,12 @@ int do_iflist(struct sock *s)
 		return -EX_OSERR;
 	}
 
-	rc = rd(s, iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
-	if (rc) {
-		free(iflist);
-		return -rc;
+	if (msg.payload.iflist.num) {
+		rc = rd(s, iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
+		if (rc) {
+			free(iflist);
+			return -rc;
+		}
 	}
 
 	for (i = 0; i < msg.payload.iflist.num; i++) {
