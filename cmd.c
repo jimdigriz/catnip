@@ -23,6 +23,7 @@
 #	include <linux/filter.h>
 #	include <netpacket/packet.h>
 #	include <net/ethernet.h>
+#	include <net/if_arp.h>
 #	define AF_LINK AF_PACKET
 #else
 #	include <net/if_dl.h>
@@ -102,11 +103,30 @@ int rd(struct sock *s, void *data, size_t size)
 	return EX_OK;
 }
 
+uint8_t map_arphrd_to_dlt(int arptype)
+{
+	switch (arptype) {
+	case ARPHRD_ETHER:
+	case ARPHRD_LOOPBACK:
+		return DLT_EN10MB;
+		break;
+	case ARPHRD_PPP:
+		return DLT_LINUX_SLL;
+		break;
+	case ARPHRD_NONE:
+		return DLT_RAW;
+		break;
+	}
+
+	return DLT_UNSUPP;
+}
+
 int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 {
 	struct ifaddrs *ifaddr, *ifa;
 	struct catnip_msg msg;
 	struct catnip_iflist *iflist;
+	struct ifreq ifr;
 	
 	if (getifaddrs(&ifaddr) == -1) {
 		PERROR("getifaddrs");
@@ -144,6 +164,16 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 
 		strncpy(iflist[msg.payload.iflist.num].name, ifa->ifa_name,
 				MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
+
+		memset(&ifr, 0, sizeof(ifr));
+		strncpy(ifr.ifr_name, ifa->ifa_name,
+				MIN(CATNIP_IFNAMSIZ, IFNAMSIZ));
+		if (ioctl(s->fd, SIOCGIFHWADDR, &ifr) == -1) {
+			PERROR("ioctl[SIOCGIFHWADDR]");
+			return -EX_OSERR;
+		}
+		iflist[msg.payload.iflist.num].type
+			= map_arphrd_to_dlt(ifr.ifr_hwaddr.sa_family);
 
 		if (ifa->ifa_flags & IFF_PROMISC)
 			iflist[msg.payload.iflist.num].flags |= IFF_PROMISC;

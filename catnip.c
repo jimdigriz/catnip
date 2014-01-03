@@ -139,7 +139,8 @@ int do_iflist(struct sock *s)
 	for (i = 0; i < msg.payload.iflist.num; i++) {
 		dprintf(STDOUT_FILENO, "%d.%s\n", i+1, iflist[i].name);
 
-		iflist[i].flags = ntohl(iflist[i].flags);
+		iflist[i].type	= ntohs(iflist[i].type);
+		iflist[i].flags	= ntohl(iflist[i].flags);
 	}
 	dprintf(STDOUT_FILENO, "%d.any (Pseudo-device that captures on all interfaces)\n", i+1);
 

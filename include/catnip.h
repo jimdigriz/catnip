@@ -64,8 +64,20 @@ struct catnip_msg {
 	}		payload;
 } __attribute__((packed));
 
+/* from pcap/bpf.h */
+#define	DLT_EN10MB	1
+#ifdef __OpenBSD__
+#define	DLT_RAW		14
+#else
+#define	DLT_RAW		12
+#endif
+#define	DLT_LINUX_SLL	113
+/* and a custom entry */
+#define	DLT_UNSUPP	255
+
 struct catnip_iflist {
 	char		name[CATNIP_IFNAMSIZ];
+	uint8_t		type;
 	uint32_t	flags;
 } __attribute__((packed));
 
