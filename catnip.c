@@ -247,6 +247,8 @@ int do_capture(struct sock *s) {
 		return -EX_OSERR;
 	}
 
+	dprintf(STDERR_FILENO, "mirroring locally to '%s'\n", ifr.ifr_name);
+
 	fpinsn = calloc(fp.bf_len, sizeof(struct catnip_sock_filter));
 	if (!fpinsn) {
 		PERROR("calloc");
