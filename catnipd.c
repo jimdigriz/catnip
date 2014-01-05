@@ -377,42 +377,41 @@ int main(int argc, char **argv)
 	if (rc < 0)
 		return -rc;
 
-	rc = rd(&s, &msg, sizeof(msg));
-	if (rc)
-		return -rc;
+	while (1) {
+		rc = rd(&s, &msg, sizeof(msg));
+		if (rc)
+			break;
 
-	switch (msg.code) {
-	case CATNIP_MSG_IFLIST:
-		dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
-		rc = cmd_iflist(&s, &msg);
-		if (rc) {
+		switch (msg.code) {
+		case CATNIP_MSG_IFLIST:
+			dprintf(STDERR_FILENO, "recv CATNIP_MSG_IFLIST\n");
+			rc = cmd_iflist(&s, &msg);
+			if (rc) {
+				memset(&msg, 0, sizeof(msg));
+				msg.code = CATNIP_MSG_ERROR;
+				msg.payload.error.sysexit = rc;
+				wr(&s, &msg, sizeof(msg));
+			}
+			break;
+		case CATNIP_MSG_MIRROR:
+			dprintf(STDERR_FILENO, "recv CATNIP_MSG_MIRROR\n");
+			rc = cmd_mirror(&s, &msg);
+			if (rc) {
+				memset(&msg, 0, sizeof(msg));
+				msg.code = CATNIP_MSG_ERROR;
+				msg.payload.error.sysexit = rc;
+				wr(&s, &msg, sizeof(msg));
+			}
+			break;
+		default:
+			dprintf(STDERR_FILENO, "unknown code: %d\n", msg.code);
 			memset(&msg, 0, sizeof(msg));
 			msg.code = CATNIP_MSG_ERROR;
-			msg.payload.error.sysexit = rc;
+			msg.payload.error.sysexit = EX_PROTOCOL;
+			rc = EX_PROTOCOL;
 			wr(&s, &msg, sizeof(msg));
 		}
-		break;
-	case CATNIP_MSG_MIRROR:
-		dprintf(STDERR_FILENO, "recv CATNIP_MSG_MIRROR\n");
-		rc = cmd_mirror(&s, &msg);
-		if (rc) {
-			memset(&msg, 0, sizeof(msg));
-			msg.code = CATNIP_MSG_ERROR;
-			msg.payload.error.sysexit = rc;
-			wr(&s, &msg, sizeof(msg));
-		}
-		break;
-	default:
-		dprintf(STDERR_FILENO, "unknown code: %d\n", msg.code);
-		memset(&msg, 0, sizeof(msg));
-		msg.code = CATNIP_MSG_ERROR;
-		msg.payload.error.sysexit = EX_PROTOCOL;
-		rc = EX_PROTOCOL;
-		wr(&s, &msg, sizeof(msg));
 	}
-	
-	/* need to deal with thie better one day */
-	while (rd(&s, &msg, 1) > 0) { }
 
 	close(s.fd);
 
