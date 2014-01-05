@@ -163,6 +163,7 @@ int do_iflist(struct sock *s)
 }
 
 int do_capture(struct sock *s) {
+	struct catnip_iflist *iflist = NULL;
 	struct catnip_msg msg = {
 		.code		= CATNIP_MSG_MIRROR,
 		.payload	= {
@@ -180,6 +181,7 @@ int do_capture(struct sock *s) {
 	fd_set rfds;
 	char *buf[64*1024];
 	struct sigaction sigact;
+	int dlt;
 
 	pfd = socket(s->addr.sa_family, SOCK_DGRAM, IPPROTO_UDP);
 	if (pfd < 0) {
@@ -198,10 +200,27 @@ int do_capture(struct sock *s) {
 		? htons(((struct sockaddr_in*)&addr)->sin_port)
 		: htons(((struct sockaddr_in6*)&addr)->sin6_port);
 
-	if (interface)
+	if (interface) {
 		strncpy(msg.payload.mirror.interface, interface, CATNIP_IFNAMSIZ);
 
-	p = pcap_open_dead(DLT_NULL, snaplen);
+		rc = get_iflist(s, &iflist);
+		if (rc < 0)
+			return rc;
+
+		for (i = 0; i < rc; i++) {
+			if (strncmp(iflist[i].name, interface, CATNIP_IFNAMSIZ) == 0) {
+				dlt = iflist[i].type;
+				break;
+			}
+		}
+		if (i == rc) {
+			dprintf(STDERR_FILENO, "interface does not exist on remote system\n");
+			return -EX_USAGE;
+		}
+	} else
+		dlt = DLT_LINUX_SLL;
+
+	p = pcap_open_dead(dlt, snaplen);
 
 	if (pcap_compile(p, &fp, filter, optimize, PCAP_NETMASK_UNKNOWN) == -1) {
 		dprintf(STDERR_FILENO, "pcap_perror: %s\n", pcap_geterr(p));
