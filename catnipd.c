@@ -191,7 +191,6 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 	struct sockaddr_ll		sa_ll;
 	int				flags, sock;
 	int				sock_type;
-	int				promisc = omsg->payload.mirror.promisc;
 
 	/* if we are capturing on 'any' then SOCK_RAW is meaningless */
 	sock_type = (omsg->payload.mirror.interface[0] != '\0') ? SOCK_RAW : SOCK_DGRAM;
@@ -259,8 +258,8 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 			return -EX_OSERR;
 		}
 
-		if (promisc) {
-			promisc = set_promisc(sock, omsg->payload.mirror.interface, 1);
+		if (omsg->payload.mirror.promisc) {
+			int promisc = set_promisc(sock, omsg->payload.mirror.interface, 1);
 			if (promisc < 0) {
 				close(sock);
 				return -promisc;
