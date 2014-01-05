@@ -182,7 +182,7 @@ int do_capture(struct sock *s) {
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 	fd_set rfds;
-	char *buf[64*1024];
+	char buf[64*1024];
 	struct sigaction sigact;
 	struct ifreq ifr;
 
@@ -322,8 +322,9 @@ int do_capture(struct sock *s) {
 		}
 
 		if (FD_ISSET(pfd, &rfds)) {
-			rc = read(pfd, buf, 64*1024);
-			rc = write(tfd, buf, rc);
+			memset(&buf, 0, 4);
+			rc = read(pfd, buf + 4, 64*1024 - 4);
+			rc = write(tfd, buf, rc + 4);
 		}
 	}
 

@@ -357,6 +357,14 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 
 		if (FD_ISSET(cfd, &rfds)) {
 			rc = read(cfd, buf, 64*1024);
+			if (rc < 0) {
+				running = 0;
+				continue;
+			} else if (rc > 64*1024 - 4) {
+				dprintf(STDERR_FILENO, "received too large a packet, truncating\n");
+				rc = 64*1024 - 4;
+			}
+
 			send(pfd, buf, rc, MSG_DONTWAIT);
 		}
 	}
