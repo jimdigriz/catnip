@@ -189,7 +189,7 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 	int			promisc = omsg->payload.mirror.promisc;
 
 	/* if we are capturing on 'any' then SOCK_RAW is meaningless */
-	sock_type = (omsg->payload.mirror.interface) ? SOCK_RAW : SOCK_DGRAM;
+	sock_type = (omsg->payload.mirror.interface[0] != '\0') ? SOCK_RAW : SOCK_DGRAM;
 
 	if ((sock = socket(PF_PACKET, sock_type, htons(ETH_P_ALL))) < 0) {
 		PERROR("socket error");
@@ -245,7 +245,7 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 		free(fp.filter);
 	}
 
-	if (omsg->payload.mirror.interface) {
+	if (omsg->payload.mirror.interface[0] != '\0') {
 		strncpy(ifr.ifr_name, omsg->payload.mirror.interface, MIN(IFNAMSIZ,CATNIP_IFNAMSIZ));
 		if (ioctl(sock, SIOCGIFINDEX, &ifr) == -1) {
 			PERROR("ioctl[SIOCGIFINDEX]");

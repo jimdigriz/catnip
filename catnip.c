@@ -201,7 +201,8 @@ int do_capture(struct sock *s) {
 		? htons(((struct sockaddr_in*)&addr)->sin_port)
 		: htons(((struct sockaddr_in6*)&addr)->sin6_port);
 
-	strncpy(msg.payload.mirror.interface, interface, CATNIP_IFNAMSIZ);
+	if (interface)
+		strncpy(msg.payload.mirror.interface, interface, CATNIP_IFNAMSIZ);
 
 	p = pcap_open_dead(DLT_NULL, snaplen);
 
