@@ -72,7 +72,7 @@ int get_arphrd_type(char *ifname) {
 	return ifr.ifr_hwaddr.sa_family;
 }
 
-/* from libpcap/pcap-linux.c */
+/* from libpcap/pcap-linux.c:map_arphrd_to_dlt */
 int map_arphrd_to_dlt(int arptype)
 {
 	switch (arptype) {
