@@ -247,6 +247,20 @@ int do_capture(struct sock *s) {
 		return -EX_OSERR;
 	}
 
+	rc = ioctl(pfd, SIOCGIFFLAGS, &ifr);
+	if (rc < 0) {
+		PERROR("ioctl[SIOCGIFFLAGS]");
+		return -EX_OSERR;
+	}
+
+	ifr.ifr_flags |= IFF_UP;
+
+	rc = ioctl(pfd, SIOCSIFFLAGS, &ifr);
+	if (rc < 0) {
+		PERROR("ioctl[SIOCSIFFLAGS]");
+		return -EX_OSERR;
+	}
+
 	dprintf(STDERR_FILENO, "mirroring locally to '%s'\n", ifr.ifr_name);
 
 	fpinsn = calloc(fp.bf_len, sizeof(struct catnip_sock_filter));
