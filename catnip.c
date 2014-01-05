@@ -142,7 +142,7 @@ int get_iflist(struct sock *s, struct catnip_iflist **iflist)
 	}
 
 	for (i = 0; i < msg.payload.iflist.num; i++)
-		iflist[i]->type	= ntohs(iflist[i]->type);
+		(*iflist)[i].type = ntohs((*iflist)[i].type);
 
 	return msg.payload.iflist.num;
 }
