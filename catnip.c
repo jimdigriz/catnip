@@ -114,11 +114,11 @@ int get_iflist(struct sock *s, struct catnip_iflist **iflist)
 
 	rc = wr(s, &msg, sizeof(msg));
 	if (rc)
-		return -rc;
+		return rc;
 
 	rc = rd(s, &msg, sizeof(msg));
 	if (rc)
-		return -rc;
+		return rc;
 
 	if (msg.code == CATNIP_MSG_ERROR) {
 		dprintf(STDERR_FILENO, "error: sysexit code %d\n", msg.payload.error.sysexit);
@@ -140,7 +140,7 @@ int get_iflist(struct sock *s, struct catnip_iflist **iflist)
 		rc = rd(s, *iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
 		if (rc) {
 			free(*iflist);
-			return -rc;
+			return rc;
 		}
 	}
 
