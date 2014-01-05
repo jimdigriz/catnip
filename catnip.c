@@ -37,6 +37,9 @@
 #include <pcap.h>
 #include <sys/select.h>
 #include <signal.h>
+#include <sys/ioctl.h>
+#include <linux/if.h>
+#include <linux/if_tun.h>
 
 #include "catnip.h"
 
@@ -175,13 +178,13 @@ int do_capture(struct sock *s) {
 	pcap_t *p;
 	struct bpf_program fp;
 	struct catnip_sock_filter *fpinsn;
-	int i, pfd, rc;
+	int i, pfd, tfd, rc, dlt;
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 	fd_set rfds;
 	char *buf[64*1024];
 	struct sigaction sigact;
-	int dlt;
+	struct ifreq ifr;
 
 	pfd = socket(s->addr.sa_family, SOCK_DGRAM, IPPROTO_UDP);
 	if (pfd < 0) {
@@ -229,7 +232,21 @@ int do_capture(struct sock *s) {
 	}
 
 	pcap_close(p);
-		
+
+	tfd = open("/dev/net/tun", O_RDWR);
+	if (tfd < 0) {
+		PERROR("open");
+		return -EX_OSERR;
+	}	
+
+	memset(&ifr, 0, sizeof(ifr));
+	ifr.ifr_flags = (dlt == DLT_EN10MB) ? IFF_TAP : IFF_TUN;
+	rc = ioctl(tfd, TUNSETIFF, &ifr);
+	if (rc < 0) {
+		PERROR("ioctl[TUNSETIFF]");
+		return -EX_OSERR;
+	}
+
 	fpinsn = calloc(fp.bf_len, sizeof(struct catnip_sock_filter));
 	if (!fpinsn) {
 		PERROR("calloc");
@@ -290,6 +307,7 @@ int do_capture(struct sock *s) {
 
 		if (FD_ISSET(pfd, &rfds)) {
 			rc = read(pfd, buf, 64*1024);
+			rc = write(tfd, buf, rc);
 		}
 	}
 
