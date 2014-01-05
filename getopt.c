@@ -155,6 +155,11 @@ int parse_args(int argc, char **argv)
 		return -EX_USAGE;
 	}
 
+	if (!listif && !interface) {
+		dprintf(STDERR_FILENO, "must supply an interface to mirror from\n");
+		return -EX_USAGE;
+	}
+
 	/* concat argv array and put it into filter */
 	if (argv[optind]) {
 		for (index = optind; index < argc; index++)
