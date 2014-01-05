@@ -107,7 +107,7 @@ int get_iflist(struct sock *s, struct catnip_iflist **iflist)
 	struct catnip_msg msg = {
 		.code	= CATNIP_MSG_IFLIST,
 	};
-	int rc, i;
+	int rc;
 
 	rc = wr(s, &msg, sizeof(msg));
 	if (rc)
