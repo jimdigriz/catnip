@@ -320,9 +320,9 @@ int cmd_mirror(struct sock *s, const struct catnip_msg *omsg)
 		return -EX_OSERR;
 	}
 	if (addr.sa_family == AF_INET) {
-		((struct sockaddr_in*)&addr)->sin_port = omsg->payload.mirror.port;
+		((struct sockaddr_in*)&addr)->sin_port = ntohs(omsg->payload.mirror.port);
 	} else {
-		((struct sockaddr_in6*)&addr)->sin6_port = omsg->payload.mirror.port;
+		((struct sockaddr_in6*)&addr)->sin6_port = ntohs(omsg->payload.mirror.port);
 	}
 	if (connect(pfd, &addr, addrlen)) {
 		PERROR("connect");
