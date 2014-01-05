@@ -182,11 +182,19 @@ int set_promisc(const int sock, const char *interface, int state) {
 
 /* alot gleened from http://www.linuxjournal.com/article/4659 */
 int open_sock(struct sock *s, const struct catnip_msg *omsg) {
-	struct ifreq		ifr;
-	struct sockaddr_ll	sa_ll;
-	int			flags, sock;
-	int			sock_type;
-	int			promisc = omsg->payload.mirror.promisc;
+	struct sock_fprog		fp = {
+		.len	= ntohs(omsg->payload.mirror.bf_len),
+	};
+	struct catnip_sock_filter	fpins;
+	char				drain[1];
+	struct sock_filter		total_insn = BPF_STMT(BPF_RET | BPF_K, 0);
+	struct sock_fprog 		total_fcode = { 1, &total_insn };
+	int				i;
+	struct ifreq			ifr;
+	struct sockaddr_ll		sa_ll;
+	int				flags, sock;
+	int				sock_type;
+	int				promisc = omsg->payload.mirror.promisc;
 
 	/* if we are capturing on 'any' then SOCK_RAW is meaningless */
 	sock_type = (omsg->payload.mirror.interface[0] != '\0') ? SOCK_RAW : SOCK_DGRAM;
@@ -196,54 +204,43 @@ int open_sock(struct sock *s, const struct catnip_msg *omsg) {
 		return -EX_OSERR;
 	}
 
-	if (omsg->payload.mirror.bf_len) {
-		struct sock_fprog		fp;
-		struct catnip_sock_filter	fpins;
-		char				drain[1];
-		struct sock_filter		total_insn = BPF_STMT(BPF_RET | BPF_K, 0);
-		struct sock_fprog 		total_fcode = { 1, &total_insn };
-		int				i;
-
-		fp.len = ntohs(omsg->payload.mirror.bf_len);
-
-		fp.filter = calloc(fp.len, sizeof(struct catnip_sock_filter));
-		if (!fp.filter) {
-			PERROR("calloc [fp.filter]");
-			return -EX_OSERR;
-		}
-
-		for (i = 0; i<fp.len; i++) {
-			if (rd(s, &fpins, sizeof(struct catnip_sock_filter)) < 0) {
-				PERROR("unable to rd bf program");
-				return -EX_SOFTWARE;
-			}
-	
-			fp.filter[i].code	= ntohs(fpins.code);
-			fp.filter[i].jt		= fpins.jt;
-			fp.filter[i].jf		= fpins.jf;
-			fp.filter[i].k		= ntohl(fpins.k);
-		}
-	
-		/* deal with socket() -> filter() race */
-		if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
-		       		&total_fcode, sizeof(total_fcode)) < 0) {
-			PERROR("setsockopt[SO_ATTACH_FILTER-total]");
-			free(fp.filter);
-			close(sock);
-			return -EX_OSERR;
-		}
-		while (recv(sock, &drain, sizeof(drain), MSG_TRUNC|MSG_DONTWAIT) >= 0)
-			;
-
-		if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER, &fp, sizeof(fp)) < 0) {
-			PERROR("setsockopt[SO_ATTACH_FILTER]");
-			free(fp.filter);
-			close(sock);
-			return -EX_OSERR;
-		}
-
-		free(fp.filter);
+	fp.filter = calloc(fp.len, sizeof(struct catnip_sock_filter));
+	if (!fp.filter) {
+		PERROR("calloc [fp.filter]");
+		return -EX_OSERR;
 	}
+
+	for (i = 0; i<fp.len; i++) {
+		if (rd(s, &fpins, sizeof(struct catnip_sock_filter)) < 0) {
+			PERROR("unable to rd bf program");
+			return -EX_SOFTWARE;
+		}
+
+		fp.filter[i].code	= ntohs(fpins.code);
+		fp.filter[i].jt		= fpins.jt;
+		fp.filter[i].jf		= fpins.jf;
+		fp.filter[i].k		= ntohl(fpins.k);
+	}
+
+	/* deal with socket() -> filter() race */
+	if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
+			&total_fcode, sizeof(total_fcode)) < 0) {
+		PERROR("setsockopt[SO_ATTACH_FILTER-total]");
+		free(fp.filter);
+		close(sock);
+		return -EX_OSERR;
+	}
+	while (recv(sock, &drain, sizeof(drain), MSG_TRUNC|MSG_DONTWAIT) >= 0)
+		;
+
+	if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER, &fp, sizeof(fp)) < 0) {
+		PERROR("setsockopt[SO_ATTACH_FILTER]");
+		free(fp.filter);
+		close(sock);
+		return -EX_OSERR;
+	}
+
+	free(fp.filter);
 
 	if (omsg->payload.mirror.interface[0] != '\0') {
 		strncpy(ifr.ifr_name, omsg->payload.mirror.interface, MIN(IFNAMSIZ,CATNIP_IFNAMSIZ));
