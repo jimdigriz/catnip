@@ -102,14 +102,12 @@ int hookup(struct sock *s, char *hostname, char *port) {
 	return EX_OK;
 }
 
-int do_iflist(struct sock *s)
+int get_iflist(struct sock *s, struct catnip_iflist **iflist)
 {
 	struct catnip_msg msg = {
 		.code	= CATNIP_MSG_IFLIST,
 	};
-	struct catnip_iflist *iflist;
-	int i;
-	int rc;
+	int rc, i;
 
 	rc = wr(s, &msg, sizeof(msg));
 	if (rc)
@@ -129,25 +127,37 @@ int do_iflist(struct sock *s)
 		return -EX_PROTOCOL;
 	}
 
-	iflist = calloc(msg.payload.iflist.num, sizeof(struct catnip_iflist));
-	if (!iflist) {
+	*iflist = calloc(msg.payload.iflist.num, sizeof(struct catnip_iflist));
+	if (!*iflist) {
 		PERROR("calloc");
 		return -EX_OSERR;
 	}
 
 	if (msg.payload.iflist.num) {
-		rc = rd(s, iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
+		rc = rd(s, *iflist, msg.payload.iflist.num*sizeof(struct catnip_iflist));
 		if (rc) {
-			free(iflist);
+			free(*iflist);
 			return -rc;
 		}
 	}
 
-	for (i = 0; i < msg.payload.iflist.num; i++) {
-		dprintf(STDOUT_FILENO, "%d.%s\n", i+1, iflist[i].name);
+	for (i = 0; i < msg.payload.iflist.num; i++)
+		iflist[i]->type	= ntohs(iflist[i]->type);
 
-		iflist[i].type	= ntohs(iflist[i].type);
-	}
+	return msg.payload.iflist.num;
+}
+
+int do_iflist(struct sock *s)
+{
+	struct catnip_iflist *iflist = NULL;
+	int rc, i;
+
+	rc = get_iflist(s, &iflist);
+	if (rc < 0)
+		return rc;
+
+	for (i = 0; i < rc; i++)
+		dprintf(STDOUT_FILENO, "%d.%s\n", i+1, iflist[i].name);
 	dprintf(STDOUT_FILENO, "%d.any (Pseudo-device that captures on all interfaces)\n", i+1);
 
 	free(iflist);
