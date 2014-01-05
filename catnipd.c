@@ -104,6 +104,9 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 
 	msg.payload.iflist.num = 0;
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+		if (!ifa->ifa_addr)
+			continue;
+
 		if (ifa->ifa_addr->sa_family != AF_LINK)
 			continue;
 
@@ -122,6 +125,9 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 	msg.payload.iflist.num = 0;
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
 		int type;
+
+		if (!ifa->ifa_addr)
+			continue;
 
 		if (ifa->ifa_addr->sa_family != AF_LINK)
 			continue;
