@@ -138,12 +138,6 @@ int cmd_iflist(struct sock *s, const struct catnip_msg *omsg)
 		type = get_arphrd_type(ifa->ifa_name);
 		iflist[msg.payload.iflist.num].type = map_arphrd_to_dlt(type);
 
-		if (ifa->ifa_flags & IFF_PROMISC)
-			iflist[msg.payload.iflist.num].flags |= IFF_PROMISC;
-
-		iflist[msg.payload.iflist.num].flags
-				= htonl(iflist[msg.payload.iflist.num].flags);
-
 		msg.payload.iflist.num++;
 	}
 

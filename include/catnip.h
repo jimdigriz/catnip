@@ -77,7 +77,6 @@ struct catnip_msg {
 struct catnip_iflist {
 	char		name[CATNIP_IFNAMSIZ];
 	uint8_t		type;
-	uint32_t	flags;
 } __attribute__((packed));
 
 /* clone of sock_filter */
