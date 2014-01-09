@@ -10,7 +10,7 @@ libpcap though).
 To run the server type as root:
   tcpsvd -vv 0 34343 ./catnipd
 
-Client commands:
+Client commands ('catnip -h' provides usage help):
  * list the interfaces at the remote end:
   ./catnip -H server -D
  * plain packet mirroring (creates a tap0 interface)
