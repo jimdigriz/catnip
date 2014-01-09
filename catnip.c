@@ -273,6 +273,7 @@ int do_capture(struct sock *s) {
 	msg.payload.mirror.bf_len = htons(fp.bf_len);
 
 	for (i = 0; i<fp.bf_len; i++) {
+#ifdef __linux__
 		/* consult libpcap/pcap-linux.c:fix_program() for wisdom */
 		switch (BPF_CLASS(fp.bf_insns[i].code)) {
 		/* http://marc.info/?l=tcpdump-workers&m=96542058228629&w=2 */
@@ -301,6 +302,7 @@ int do_capture(struct sock *s) {
 				}
 			break;
 		}
+#endif
 
 		fpinsn[i].code	= htons(fp.bf_insns[i].code);
 		fpinsn[i].jt	= fp.bf_insns[i].jt;
