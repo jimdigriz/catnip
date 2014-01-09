@@ -273,6 +273,35 @@ int do_capture(struct sock *s) {
 	msg.payload.mirror.bf_len = htons(fp.bf_len);
 
 	for (i = 0; i<fp.bf_len; i++) {
+		/* consult libpcap/pcap-linux.c:fix_program() for wisdom */
+		switch (BPF_CLASS(fp.bf_insns[i].code)) {
+		/* http://marc.info/?l=tcpdump-workers&m=96542058228629&w=2 */
+		case BPF_RET:
+			if (BPF_MODE(fp.bf_insns[i].code) == BPF_K && fp.bf_insns[i].k)
+				fp.bf_insns[i].k = 65535;
+			break;
+		case BPF_LD:
+		case BPF_LDX:
+			if (BPF_MODE(fp.bf_insns[i].code) == BPF_ABS
+					|| BPF_MODE(fp.bf_insns[i].code) == BPF_IND
+					|| BPF_MODE(fp.bf_insns[i].code) == BPF_MSH)
+				if (dlt == DLT_LINUX_SLL) {
+					if (fp.bf_insns[i].k >= SLL_HDR_LEN)
+						fp.bf_insns[i].k -= SLL_HDR_LEN;
+					else if (fp.bf_insns[i].k == 0)
+						fp.bf_insns[i].k = SKF_AD_OFF + SKF_AD_PKTTYPE;
+					else if (fp.bf_insns[i].k == 14)
+						fp.bf_insns[i].k = SKF_AD_OFF + SKF_AD_PROTOCOL;
+					else {
+						dprintf(STDERR_FILENO, "unable to filter with bpf\n");
+						free(fpinsn);
+						pcap_freecode(&fp);
+						return -EX_SOFTWARE;
+					}
+				}
+			break;
+		}
+
 		fpinsn[i].code	= htons(fp.bf_insns[i].code);
 		fpinsn[i].jt	= fp.bf_insns[i].jt;
 		fpinsn[i].jf	= fp.bf_insns[i].jf;

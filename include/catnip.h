@@ -74,6 +74,10 @@ struct catnip_msg {
 /* and a custom entry */
 #define	DLT_UNSUPP	255
 
+/* from pcap/sll.h */
+#define SLL_HDR_LEN	16
+#define SLL_ADDRLEN	8
+
 struct catnip_iflist {
 	char		name[CATNIP_IFNAMSIZ];
 	uint8_t		type;
