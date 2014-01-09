@@ -179,7 +179,7 @@ int do_capture(struct sock *s) {
 	struct bpf_program fp;
 	struct catnip_sock_filter *fpinsn;
 	int i, pfd, tfd, rc, dlt;
-	struct sockaddr addr;
+	struct sockaddr addr = {0};
 	socklen_t addrlen = sizeof(addr);
 	fd_set rfds;
 	char buf[64*1024];
@@ -191,7 +191,7 @@ int do_capture(struct sock *s) {
 		PERROR("socket");
 		return -EX_UNAVAILABLE;
 	}
-	if (bind(pfd, &s->addr, s->addrlen)) {
+	if (bind(pfd, &addr, addrlen)) {
 		PERROR("bind");
 		return -EX_UNAVAILABLE;
 	}
