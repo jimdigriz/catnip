@@ -4,10 +4,11 @@ packets over a UDP data channel back.  The client decodes the payload and
 squirts it into a tuntap interface that you can then use tcpdump on.
 
 This makes the server a very small stub, suitable to be installed on an
-embedded environment; as it does not need libpcap.
+embedded environment; as it does not need libpcap (the client does need
+libpcap though).
 
-To run the server:
+To run the server type as root:
   tcpsvd -vv 0 34343 ./catnipd
 
-The client is run as:
+The client is run as root with:
   ./catnip -H server -D
